@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
 	"github.com/rail44/hoge/common"
+	"github.com/rail44/hoge/profile"
 )
 
-func Select(opts ...common.SelectOption) string {
+type ExprOption func(*common.State, *ast.Expr)
+type SelectOption func(*common.State, *ast.Select)
+
+func Select(opts ...SelectOption) string {
 	tableName := "user"
 
 	s := &common.State{
@@ -35,53 +39,14 @@ func Select(opts ...common.SelectOption) string {
 	return stmt.SQL()
 }
 
-func JoinProfile(whereOpt common.ExprOption) common.SelectOption {
+func JoinProfile(whereOpt profile.ExprOption) SelectOption {
 	return func(s *common.State, sl *ast.Select) {
-		// profileテーブルを追加
-		s.Tables["profile"] = struct{}{}
-		
-		// JOIN構造を作成
-		join := &ast.Join{
-			Op: ast.InnerJoin,
-			Left: sl.From.Source,
-			Right: &ast.TableName{
-				Table: &ast.Ident{Name: "profile"},
-			},
-			Cond: &ast.On{
-				Expr: &ast.BinaryExpr{
-					Left: &ast.Path{
-						Idents: []*ast.Ident{
-							{Name: "profile"},
-							{Name: "user_id"},
-						},
-					},
-					Op: ast.OpEqual,
-					Right: &ast.Path{
-						Idents: []*ast.Ident{
-							{Name: "user"},
-							{Name: "id"},
-						},
-					},
-				},
-			},
-		}
-		
-		// FromのSourceを置き換え
-		sl.From.Source = join
-		
-		// WHERE句にprofileの条件を追加
-		if whereOpt != nil {
-			if sl.Where == nil {
-				sl.Where = &ast.Where{}
-			}
-			whereOpt(s, &sl.Where.Expr)
-		}
 	}
 }
 
 
 
-func ID(op ast.BinaryOp, value string) common.ExprOption {
+func ID(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -101,7 +66,7 @@ func ID(op ast.BinaryOp, value string) common.ExprOption {
 	}
 }
 
-func Name(op ast.BinaryOp, value string) common.ExprOption {
+func Name(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -121,7 +86,7 @@ func Name(op ast.BinaryOp, value string) common.ExprOption {
 	}
 }
 
-func Email(op ast.BinaryOp, value string) common.ExprOption {
+func Email(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -140,3 +105,44 @@ func Email(op ast.BinaryOp, value string) common.ExprOption {
 		}
 	}
 }
+
+func Where(opt ExprOption) SelectOption {
+	return func(s *common.State, sl *ast.Select) {
+		where := ast.Where{}
+		opt(s, &where.Expr)
+
+		sl.Where = &where
+	}
+}
+
+
+func And(left, right ExprOption) ExprOption {
+	return Paren(func(s *common.State, expr *ast.Expr) {
+		b := &ast.BinaryExpr{
+			Op: ast.OpAnd,
+		}
+		left(s, &b.Left)
+		right(s, &b.Right)
+		*expr = b
+	})
+}
+
+func Or(left, right ExprOption) ExprOption {
+	return Paren(func(s *common.State, expr *ast.Expr) {
+		b := &ast.BinaryExpr{
+			Op: ast.OpOr,
+		}
+		left(s, &b.Left)
+		right(s, &b.Right)
+		*expr = b
+	})
+}
+
+func Paren(inner ExprOption) ExprOption {
+	return func(s *common.State, expr *ast.Expr) {
+		paren := ast.ParenExpr{}
+		inner(s, &paren.Expr)
+		*expr = &paren
+	}
+}
+

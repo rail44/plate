@@ -6,7 +6,10 @@ import (
 	"github.com/rail44/hoge/common"
 )
 
-func UserID(op ast.BinaryOp, value string) common.ExprOption {
+type ExprOption func(*common.State, *ast.Expr)
+type SelectOption func(*common.State, *ast.Select)
+
+func UserID(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -26,7 +29,7 @@ func UserID(op ast.BinaryOp, value string) common.ExprOption {
 	}
 }
 
-func Bio(op ast.BinaryOp, value string) common.ExprOption {
+func Bio(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -45,3 +48,44 @@ func Bio(op ast.BinaryOp, value string) common.ExprOption {
 		}
 	}
 }
+
+func Where(opt ExprOption) SelectOption {
+	return func(s *common.State, sl *ast.Select) {
+		where := ast.Where{}
+		opt(s, &where.Expr)
+
+		sl.Where = &where
+	}
+}
+
+
+func And(left, right ExprOption) ExprOption {
+	return Paren(func(s *common.State, expr *ast.Expr) {
+		b := &ast.BinaryExpr{
+			Op: ast.OpAnd,
+		}
+		left(s, &b.Left)
+		right(s, &b.Right)
+		*expr = b
+	})
+}
+
+func Or(left, right ExprOption) ExprOption {
+	return Paren(func(s *common.State, expr *ast.Expr) {
+		b := &ast.BinaryExpr{
+			Op: ast.OpOr,
+		}
+		left(s, &b.Left)
+		right(s, &b.Right)
+		*expr = b
+	})
+}
+
+func Paren(inner ExprOption) ExprOption {
+	return func(s *common.State, expr *ast.Expr) {
+		paren := ast.ParenExpr{}
+		inner(s, &paren.Expr)
+		*expr = &paren
+	}
+}
+
