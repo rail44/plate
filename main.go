@@ -95,20 +95,6 @@ func Paren(inner ExprOption) ExprOption {
 }
 
 func main() {
-	stmt, err := parser.ParseStatement("", "SELECT * FROM users WHERE id = 1")
-	if err != nil {
-		panic(fmt.Errorf("Error parsing statement: %v\n", err))
-	}
-	switch ty := stmt.(type) {
-	case *ast.QueryStatement:
-		switch ty := ty.Query.(type) {
-		case *ast.Select:
-			switch ty.Where.Expr.(type) {
-			case *ast.BinaryExpr:
-			}
-		}
-	}
-
 	sql := Select(
 		Where(
 			Or(
