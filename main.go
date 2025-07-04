@@ -1,0 +1,101 @@
+package main
+
+import (
+	"fmt"
+	parser "github.com/cloudspannerecosystem/memefish"
+	"github.com/cloudspannerecosystem/memefish/ast"
+)
+
+type state struct {
+	params []any
+}
+
+type SelectOption func(*state, *ast.Select)
+
+func Select(opts ...SelectOption) string {
+	var state state
+	stmt := ast.Select{
+		Results: []ast.SelectItem {
+			&ast.Star{},
+		},
+		From: &ast.From{
+			Source: &ast.TableName{
+				Table: &ast.Ident{
+					Name: "users",
+				},
+			},
+		},
+	}
+	for _, opt := range opts {
+		opt(&state, &stmt)
+	}
+
+	return stmt.SQL()
+}
+
+type ExprOption func(*state, *ast.Expr)
+
+func Where(opts ...ExprOption) SelectOption {
+	return func(state *state, sl *ast.Select) {
+		where := ast.Where{}
+		for _, opt := range opts {
+			opt(state, &where.Expr)
+		}
+
+		sl.Where = &where
+	}
+}
+
+func Name(op ast.BinaryOp, name string) ExprOption {
+	return func(state *state, expr *ast.Expr) {
+		i := len(state.params)
+		state.params = append(state.params, name)
+
+		*expr = &ast.BinaryExpr{
+			Left: &ast.Ident{
+				Name: "name",
+			},
+			Op: op,
+			Right: &ast.Param{
+				Name: fmt.Sprintf("p%d", i),
+			},
+		}
+	}
+}
+
+func And(left, right ExprOption) ExprOption {
+	return func(state *state, expr *ast.Expr) {
+		b := &ast.BinaryExpr{
+			Op: ast.OpAnd,
+		}
+		left(state, &b.Left)
+		right(state, &b.Right)
+		*expr = b
+	}
+}
+
+func main() {
+	stmt, err := parser.ParseStatement("", "SELECT * FROM users WHERE id = 1")
+	if err != nil {
+		panic(fmt.Errorf("Error parsing statement: %v\n", err))
+	}
+	switch ty := stmt.(type) {
+	case *ast.QueryStatement:
+		switch ty := ty.Query.(type) {
+		case *ast.Select:
+			switch ty.Where.Expr.(type) {
+			case *ast.BinaryExpr:
+			}
+		}
+	}
+
+	sql := Select(
+		Where(
+			And(
+				Name(ast.OpEqual, "name"),
+				Name(ast.OpEqual, "name2"),
+			),
+		),
+	)
+	fmt.Printf("Generated SQL: %s", sql)
+}
