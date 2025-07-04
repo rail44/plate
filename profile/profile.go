@@ -17,7 +17,7 @@ func UserID(op ast.BinaryOp, value string) ExprOption {
 		*expr = &ast.BinaryExpr{
 			Left: &ast.Path{
 				Idents: []*ast.Ident{
-					{Name: "profile"},
+					{Name: s.WorkingTableAlias},
 					{Name: "user_id"},
 				},
 			},
@@ -37,7 +37,7 @@ func Bio(op ast.BinaryOp, value string) ExprOption {
 		*expr = &ast.BinaryExpr{
 			Left: &ast.Path{
 				Idents: []*ast.Ident{
-					{Name: "profile"},
+					{Name: s.WorkingTableAlias},
 					{Name: "bio"},
 				},
 			},
