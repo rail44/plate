@@ -26,6 +26,7 @@ func Select(opts ...SelectOption) string {
 			},
 		},
 	}
+
 	for _, opt := range opts {
 		opt(&state, &stmt)
 	}
@@ -64,27 +65,25 @@ func Name(op ast.BinaryOp, name string) ExprOption {
 }
 
 func And(left, right ExprOption) ExprOption {
-	return func(state *state, expr *ast.Expr) {
+	return Paren(func(state *state, expr *ast.Expr) {
 		b := &ast.BinaryExpr{
 			Op: ast.OpAnd,
 		}
 		left(state, &b.Left)
 		right(state, &b.Right)
-		*expr = &ast.ParenExpr{
-			Expr: b,
-		}
-	}
+		*expr = b
+	})
 }
 
 func Or(left, right ExprOption) ExprOption {
-	return func(state *state, expr *ast.Expr) {
+	return Paren(func(state *state, expr *ast.Expr) {
 		b := &ast.BinaryExpr{
 			Op: ast.OpOr,
 		}
 		left(state, &b.Left)
 		right(state, &b.Right)
 		*expr = b
-	}
+	})
 }
 
 func Paren(inner ExprOption) ExprOption {
