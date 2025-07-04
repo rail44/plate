@@ -2,18 +2,24 @@ package main
 
 import (
 	"fmt"
-	parser "github.com/cloudspannerecosystem/memefish"
 	"github.com/cloudspannerecosystem/memefish/ast"
+
+	"github.com/rail44/hoge/profile"
 )
 
 type state struct {
+	tables map[string]struct{}
 	params []any
 }
 
 type SelectOption func(*state, *ast.Select)
 
 func Select(opts ...SelectOption) string {
+	tableName := "users"
+
 	var state state
+	state.tables[tableName] = struct{}{}
+
 	stmt := ast.Select{
 		Results: []ast.SelectItem {
 			&ast.Star{},
@@ -21,7 +27,7 @@ func Select(opts ...SelectOption) string {
 		From: &ast.From{
 			Source: &ast.TableName{
 				Table: &ast.Ident{
-					Name: "users",
+					Name: tableName,
 				},
 			},
 		},
@@ -32,6 +38,11 @@ func Select(opts ...SelectOption) string {
 	}
 
 	return stmt.SQL()
+}
+
+func JoinProfile(profile.ExprOption) SelectOption {
+	return func(state *state, sl *ast.Select) {
+	}
 }
 
 type ExprOption func(*state, *ast.Expr)
