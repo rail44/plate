@@ -36,12 +36,10 @@ func Select(opts ...SelectOption) string {
 
 type ExprOption func(*state, *ast.Expr)
 
-func Where(opts ...ExprOption) SelectOption {
+func Where(opt ExprOption) SelectOption {
 	return func(state *state, sl *ast.Select) {
 		where := ast.Where{}
-		for _, opt := range opts {
-			opt(state, &where.Expr)
-		}
+		opt(state, &where.Expr)
 
 		sl.Where = &where
 	}
