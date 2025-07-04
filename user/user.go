@@ -8,9 +8,9 @@ import (
 )
 
 type ExprOption func(*common.State, *ast.Expr)
-type SelectOption func(*common.State, *ast.Select)
+type QueryOption func(*common.State, *ast.Query)
 
-func Select(opts ...SelectOption) string {
+func Select(opts ...QueryOption) string {
 	tableName := "user"
 
 	s := &common.State{
@@ -33,15 +33,20 @@ func Select(opts ...SelectOption) string {
 		},
 	}
 
-	for _, opt := range opts {
-		opt(s, &stmt)
+	query := &ast.Query{
+		Query: &stmt,
 	}
 
-	return stmt.SQL()
+	for _, opt := range opts {
+		opt(s, query)
+	}
+
+	return query.SQL()
 }
 
-func JoinProfile(whereOpt profile.ExprOption) SelectOption {
-	return func(s *common.State, sl *ast.Select) {
+func JoinProfile(whereOpt profile.ExprOption) QueryOption {
+	return func(s *common.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
 		// Find available alias for profile table
 		baseTableName := "profile"
 		tableName := baseTableName
@@ -186,8 +191,9 @@ func Email(op ast.BinaryOp, value string) ExprOption {
 	}
 }
 
-func Where(opt ExprOption) SelectOption {
-	return func(s *common.State, sl *ast.Select) {
+func Where(opt ExprOption) QueryOption {
+	return func(s *common.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
 		if sl.Where == nil {
 			sl.Where = &ast.Where{}
 		}
@@ -195,6 +201,43 @@ func Where(opt ExprOption) SelectOption {
 	}
 }
 
+func Limit(count int) QueryOption {
+	return func(s *common.State, q *ast.Query) {
+		q.Limit = &ast.Limit{
+			Count: &ast.IntLiteral{
+				Value: fmt.Sprintf("%d", count),
+			},
+		}
+	}
+}
+
+func OrderBy(column string, dir ast.Direction) QueryOption {
+	return func(s *common.State, q *ast.Query) {
+		// Create or append to OrderBy
+		if q.OrderBy == nil {
+			q.OrderBy = &ast.OrderBy{
+				Items: []*ast.OrderByItem{},
+			}
+		}
+		
+		q.OrderBy.Items = append(q.OrderBy.Items, &ast.OrderByItem{
+			Expr: &ast.Path{
+				Idents: []*ast.Ident{
+					{Name: s.WorkingTableAlias},
+					{Name: column},
+				},
+			},
+			Dir: dir,
+		})
+	}
+}
+
+
+// OrderBy column names
+const (
+	OrderByID   = "id"
+	OrderByName = "name"
+)
 
 func And(left, right ExprOption) ExprOption {
 	return Paren(func(s *common.State, expr *ast.Expr) {

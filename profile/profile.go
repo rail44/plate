@@ -7,7 +7,7 @@ import (
 )
 
 type ExprOption func(*common.State, *ast.Expr)
-type SelectOption func(*common.State, *ast.Select)
+type QueryOption func(*common.State, *ast.Query)
 
 func UserID(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
@@ -49,8 +49,9 @@ func Bio(op ast.BinaryOp, value string) ExprOption {
 	}
 }
 
-func Where(opt ExprOption) SelectOption {
-	return func(s *common.State, sl *ast.Select) {
+func Where(opt ExprOption) QueryOption {
+	return func(s *common.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
 		where := ast.Where{}
 		opt(s, &where.Expr)
 
