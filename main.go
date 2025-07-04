@@ -70,7 +70,28 @@ func And(left, right ExprOption) ExprOption {
 		}
 		left(state, &b.Left)
 		right(state, &b.Right)
+		*expr = &ast.ParenExpr{
+			Expr: b,
+		}
+	}
+}
+
+func Or(left, right ExprOption) ExprOption {
+	return func(state *state, expr *ast.Expr) {
+		b := &ast.BinaryExpr{
+			Op: ast.OpOr,
+		}
+		left(state, &b.Left)
+		right(state, &b.Right)
 		*expr = b
+	}
+}
+
+func Paren(inner ExprOption) ExprOption {
+	return func(state *state, expr *ast.Expr) {
+		paren := ast.ParenExpr{}
+		inner(state, &paren.Expr)
+		*expr = &paren
 	}
 }
 
@@ -91,9 +112,12 @@ func main() {
 
 	sql := Select(
 		Where(
-			And(
-				Name(ast.OpEqual, "name"),
-				Name(ast.OpEqual, "name2"),
+			Or(
+				And(
+					Name(ast.OpEqual, "name"),
+					Name(ast.OpEqual, "name2"),
+				),
+				Name(ast.OpEqual, "name3"),
 			),
 		),
 	)
