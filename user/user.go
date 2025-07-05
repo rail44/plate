@@ -21,7 +21,7 @@ func Select(opts ...types.QueryOption[User]) (string, []any) {
 	return query.BuildSelect("user", untyped)
 }
 
-func JoinProfile(whereOpt profile.ExprOption) types.QueryOption[User] {
+func JoinProfile(whereOpt types.ExprOption[profile.Profile]) types.QueryOption[User] {
 	return types.QueryOption[User](query.BuildJoin(query.JoinConfig{
 		BaseTable:   "user",
 		TargetTable: "profile",

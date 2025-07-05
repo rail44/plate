@@ -7,10 +7,9 @@ import (
 	"github.com/rail44/plate/query"
 )
 
-type ExprOption func(*types.State, *ast.Expr)
-type QueryOption func(*types.State, *ast.Query)
+type Profile struct {}
 
-func Select(opts ...QueryOption) (string, []any) {
+func Select(opts ...types.QueryOption[Profile]) (string, []any) {
 	// Convert typed options to untyped for helper
 	untyped := make([]func(*types.State, *ast.Query), len(opts))
 	for i, opt := range opts {
@@ -21,7 +20,7 @@ func Select(opts ...QueryOption) (string, []any) {
 	return query.BuildSelect("profile", untyped)
 }
 
-func UserID(op ast.BinaryOp, value string) ExprOption {
+func UserID(op ast.BinaryOp, value string) types.ExprOption[Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -29,7 +28,7 @@ func UserID(op ast.BinaryOp, value string) ExprOption {
 	}
 }
 
-func Bio(op ast.BinaryOp, value string) ExprOption {
+func Bio(op ast.BinaryOp, value string) types.ExprOption[Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -37,7 +36,7 @@ func Bio(op ast.BinaryOp, value string) ExprOption {
 	}
 }
 
-func Where(opt ExprOption) QueryOption {
+func Where(opt types.ExprOption[Profile]) types.QueryOption[Profile] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		if sl.Where == nil {
@@ -47,7 +46,7 @@ func Where(opt ExprOption) QueryOption {
 	}
 }
 
-func And(left, right ExprOption) ExprOption {
+func And(left, right types.ExprOption[Profile]) types.ExprOption[Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
@@ -56,7 +55,7 @@ func And(left, right ExprOption) ExprOption {
 	}
 }
 
-func Or(left, right ExprOption) ExprOption {
+func Or(left, right types.ExprOption[Profile]) types.ExprOption[Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
@@ -65,7 +64,7 @@ func Or(left, right ExprOption) ExprOption {
 	}
 }
 
-func Paren(inner ExprOption) ExprOption {
+func Paren(inner types.ExprOption[Profile]) types.ExprOption[Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		var innerExpr ast.Expr
 		inner(s, &innerExpr)
@@ -73,13 +72,13 @@ func Paren(inner ExprOption) ExprOption {
 	}
 }
 
-func Limit(count int) QueryOption {
+func Limit(count int) types.QueryOption[Profile] {
 	return func(s *types.State, q *ast.Query) {
 		q.Limit = query.BuildLimit(count)
 	}
 }
 
-func OrderBy(column string, dir ast.Direction) QueryOption {
+func OrderBy(column string, dir ast.Direction) types.QueryOption[Profile] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{
