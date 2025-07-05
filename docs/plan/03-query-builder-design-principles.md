@@ -6,14 +6,16 @@ This document explains the key design decisions behind our SQL query builder arc
 
 ### 1. Type Safety Above All
 
-Every table package has its own `ExprOption` and `QueryOption` types. This prevents mixing expressions from different tables:
+The architecture uses a centralized `tables` package with type-parameterized options to prevent mixing expressions from different tables:
 
 ```go
 // Compile error - cannot mix user and profile expressions
-user.Select(profile.Where(...))  // ❌
+query.Select[tables.User](
+    profile.Bio(ast.OpEqual, "Engineer"),  // ❌ Type error!
+)
 ```
 
-This design choice trades some code duplication for compile-time safety.
+This design provides compile-time safety while allowing code reuse through generics.
 
 ### 2. Functional Options Pattern
 
@@ -24,7 +26,7 @@ We use functional options for query construction because:
 
 ### 3. State Management
 
-The `common.State` structure serves three critical purposes:
+The `types.State` structure serves three critical purposes:
 1. **Parameter tracking**: Sequential parameter naming (p0, p1, p2...)
 2. **Table alias management**: Prevents naming conflicts in JOINs
 3. **Context preservation**: Maintains current table context for column qualification
@@ -43,13 +45,22 @@ Helper functions return values rather than modifying pointers because:
 - Pure functions are easier to test and reason about
 - Follows Go's preference for value semantics where appropriate
 
+### 6. Developer Experience First
+
+The API is designed for intuitive usage:
+- **No Where() needed**: Column conditions can be passed directly to Select
+- **Implicit AND**: Multiple conditions are joined with AND by default
+- **Explicit OR**: OR conditions require explicit Or() function call
+- **Mixed options**: Select accepts both QueryOption and ExprOption types
+
 ## Trade-offs
 
 ### Code Duplication vs Type Safety
-Each package has similar functions (And, Or, Where, etc.). We accept this duplication because:
+Each table package has similar functions (column builders, Or, Where, etc.). We accept this duplication because:
 - Type safety prevents critical runtime errors
 - Code is generated, so maintenance burden is minimal
 - Clear ownership and boundaries
+- Go's type inference limitations prevent fully generic implementations
 
 ### Simplicity vs Features
 We prioritize a simple, predictable API over supporting every SQL feature because:

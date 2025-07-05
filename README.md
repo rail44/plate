@@ -7,10 +7,10 @@ Plate is a type-safe SQL query builder generator for Go, designed to work with G
 Plate generates strongly-typed query builders from your database schema, ensuring compile-time safety for SQL query construction.
 
 ```go
-// Type-safe query construction
-sql, params := user.Select(
+// Type-safe query construction with implicit AND conditions
+sql, params := query.Select[tables.User](
     user.JoinProfile(profile.Bio(ast.OpEqual, "Engineer")),
-    user.Where(user.Name(ast.OpEqual, "John")),
+    user.Name(ast.OpEqual, "John"),  // No Where() needed!
     user.OrderBy(user.OrderByName, ast.DirectionAsc),
     user.Limit(10),
 )
@@ -24,6 +24,7 @@ sql, params := user.Select(
 - **SQL Injection Prevention**: All values are parameterized
 - **Composable**: Build complex queries with functional options
 - **Zero Runtime Reflection**: All code is generated at compile time
+- **Intuitive API**: Direct condition passing without Where(), implicit AND, explicit OR
 
 ## Design Principles
 
@@ -31,41 +32,59 @@ sql, params := user.Select(
 2. **Functional options pattern** - Flexible and composable query construction
 3. **Pure functions where possible** - Easier to test and reason about
 4. **Generated code should be readable** - As if hand-written
+5. **Developer experience first** - Prioritize intuitive API over implementation complexity
 
 ## Project Structure
 
 ```
+├── tables/         # Centralized table type definitions
+├── types/          # Core type definitions (Table, State, Options)
 ├── user/           # User table query builder
 ├── profile/        # Profile table query builder
-├── query/          # Shared helper functions
-├── common/         # Common types (State)
+├── query/          # Shared helper functions and generic Select
 └── docs/plan/      # Design documents
 ```
 
 ## Usage Example
 
 ```go
-// Simple select
-sql, params := user.Select(
-    user.Where(user.Email(ast.OpEqual, "john@example.com")),
+// Simple select - no Where() needed!
+sql, params := query.Select[tables.User](
+    user.Email(ast.OpEqual, "john@example.com"),
+)
+
+// Multiple conditions - implicit AND
+sql, params := query.Select[tables.User](
+    user.Name(ast.OpEqual, "John"),
+    user.Email(ast.OpLike, "%@example.com"),
+    user.Limit(10),
+)
+
+// Explicit OR conditions
+sql, params := query.Select[tables.User](
+    user.Or(
+        user.Name(ast.OpEqual, "John"),
+        user.Name(ast.OpEqual, "Jane"),
+        user.Name(ast.OpEqual, "Bob"),
+    ),
+    user.OrderBy(user.OrderByID, ast.DirectionDesc),
 )
 
 // Complex query with JOIN
-sql, params := user.Select(
-    user.JoinProfile(
-        profile.And(
-            profile.Bio(ast.OpEqual, "Engineer"),
-            profile.UserID(ast.OpNotEqual, "123"),
-        ),
+sql, params := query.Select[tables.User](
+    user.JoinProfile(profile.Bio(ast.OpEqual, "Engineer")),
+    user.Email(ast.OpLike, "%@company.com"),
+    user.Or(
+        user.Name(ast.OpEqual, "Admin"),
+        user.ID(ast.OpEqual, "1"),
     ),
-    user.Where(
-        user.Or(
-            user.Name(ast.OpEqual, "John"),
-            user.Name(ast.OpEqual, "Jane"),
-        ),
-    ),
-    user.OrderBy(user.OrderByID, ast.DirectionDesc),
     user.Limit(20),
+)
+
+// Bidirectional JOIN - Profile to User
+sql, params := query.Select[tables.Profile](
+    profile.JoinUser(user.Name(ast.OpEqual, "John")),
+    profile.Bio(ast.OpEqual, "Engineer"),
 )
 ```
 
@@ -78,7 +97,7 @@ See [docs/plan/](docs/plan/) for detailed design decisions and future plans.
 ## Dependencies
 
 - [memefish](https://github.com/cloudspannerecosystem/memefish) - SQL parser for Cloud Spanner
-- Go 1.18+ (no generics used currently, but may be added)
+- Go 1.18+ (generics are used for type-safe query construction)
 
 ## License
 
