@@ -3,19 +3,18 @@ package profile
 import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/plate/common"
+	"github.com/rail44/plate/types"
 	"github.com/rail44/plate/query"
 )
 
-type ExprOption func(*common.State, *ast.Expr)
-type QueryOption func(*common.State, *ast.Query)
+type ExprOption func(*types.State, *ast.Expr)
+type QueryOption func(*types.State, *ast.Query)
 
 func Select(opts ...QueryOption) (string, []any) {
 	// Convert typed options to untyped for helper
-	untyped := make([]func(*common.State, *ast.Query), len(opts))
+	untyped := make([]func(*types.State, *ast.Query), len(opts))
 	for i, opt := range opts {
-		opt := opt // capture loop variable
-		untyped[i] = func(s *common.State, q *ast.Query) {
+		untyped[i] = func(s *types.State, q *ast.Query) {
 			opt(s, q)
 		}
 	}
@@ -23,7 +22,7 @@ func Select(opts ...QueryOption) (string, []any) {
 }
 
 func UserID(op ast.BinaryOp, value string) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
 		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "user_id", op, fmt.Sprintf("p%d", i))
@@ -31,7 +30,7 @@ func UserID(op ast.BinaryOp, value string) ExprOption {
 }
 
 func Bio(op ast.BinaryOp, value string) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
 		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "bio", op, fmt.Sprintf("p%d", i))
@@ -39,7 +38,7 @@ func Bio(op ast.BinaryOp, value string) ExprOption {
 }
 
 func Where(opt ExprOption) QueryOption {
-	return func(s *common.State, q *ast.Query) {
+	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		if sl.Where == nil {
 			sl.Where = &ast.Where{}
@@ -49,7 +48,7 @@ func Where(opt ExprOption) QueryOption {
 }
 
 func And(left, right ExprOption) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
 		right(s, &rightExpr)
@@ -58,7 +57,7 @@ func And(left, right ExprOption) ExprOption {
 }
 
 func Or(left, right ExprOption) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
 		right(s, &rightExpr)
@@ -67,7 +66,7 @@ func Or(left, right ExprOption) ExprOption {
 }
 
 func Paren(inner ExprOption) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+	return func(s *types.State, expr *ast.Expr) {
 		var innerExpr ast.Expr
 		inner(s, &innerExpr)
 		*expr = query.BuildParenExpr(innerExpr)
@@ -75,13 +74,13 @@ func Paren(inner ExprOption) ExprOption {
 }
 
 func Limit(count int) QueryOption {
-	return func(s *common.State, q *ast.Query) {
+	return func(s *types.State, q *ast.Query) {
 		q.Limit = query.BuildLimit(count)
 	}
 }
 
 func OrderBy(column string, dir ast.Direction) QueryOption {
-	return func(s *common.State, q *ast.Query) {
+	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{
 				Items: []*ast.OrderByItem{},

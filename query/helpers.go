@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/plate/common"
+	"github.com/rail44/plate/types"
 )
 
 // BuildLimit creates a Limit AST node
@@ -82,8 +82,8 @@ func BuildColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName strin
 }
 
 // BuildSelect creates a SELECT query with the given options
-func BuildSelect(tableName string, opts []func(*common.State, *ast.Query)) (string, []any) {
-	s := &common.State{
+func BuildSelect(tableName string, opts []func(*types.State, *ast.Query)) (string, []any) {
+	s := &types.State{
 		Tables:            make(map[string]struct{}),
 		Params:            []any{},
 		WorkingTableAlias: tableName,
@@ -123,8 +123,8 @@ type JoinConfig struct {
 }
 
 // BuildJoin creates a JOIN operation with the given configuration
-func BuildJoin(config JoinConfig, whereOpt func(*common.State, *ast.Expr)) func(*common.State, *ast.Query) {
-	return func(s *common.State, q *ast.Query) {
+func BuildJoin(config JoinConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
+	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
 		// Find available alias for target table

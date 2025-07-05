@@ -3,65 +3,63 @@ package user
 import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/plate/common"
 	"github.com/rail44/plate/profile"
 	"github.com/rail44/plate/query"
+	"github.com/rail44/plate/types"
 )
 
-type ExprOption func(*common.State, *ast.Expr)
-type QueryOption func(*common.State, *ast.Query)
+type User struct {}
 
-func Select(opts ...QueryOption) (string, []any) {
+func Select(opts ...types.QueryOption[User]) (string, []any) {
 	// Convert typed options to untyped for helper
-	untyped := make([]func(*common.State, *ast.Query), len(opts))
+	untyped := make([]func(*types.State, *ast.Query), len(opts))
 	for i, opt := range opts {
-		opt := opt // capture loop variable
-		untyped[i] = func(s *common.State, q *ast.Query) {
+		untyped[i] = func(s *types.State, q *ast.Query) {
 			opt(s, q)
 		}
 	}
 	return query.BuildSelect("user", untyped)
 }
 
-func JoinProfile(whereOpt profile.ExprOption) QueryOption {
-	return QueryOption(query.BuildJoin(query.JoinConfig{
+func JoinProfile(whereOpt profile.ExprOption) types.QueryOption[User] {
+	return types.QueryOption[User](query.BuildJoin(query.JoinConfig{
 		BaseTable:   "user",
 		TargetTable: "profile",
 		BaseKey:     "id",
 		TargetKey:   "user_id",
-	}, func(s *common.State, expr *ast.Expr) {
+	}, func(s *types.State, expr *ast.Expr) {
 		if whereOpt != nil {
 			whereOpt(s, expr)
 		}
 	}))
 }
 
-func ID(op ast.BinaryOp, value string) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+func ID(op ast.BinaryOp, value string) types.ExprOption[User] {
+	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
 		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
-func Name(op ast.BinaryOp, value string) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+func Name(op ast.BinaryOp, value string) types.ExprOption[User] {
+	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
 		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "name", op, fmt.Sprintf("p%d", i))
 	}
 }
 
-func Email(op ast.BinaryOp, value string) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+func Email(op ast.BinaryOp, value string) types.ExprOption[User] {
+	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
 		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "email", op, fmt.Sprintf("p%d", i))
 	}
 }
 
-func Where(opt ExprOption) QueryOption {
-	return func(s *common.State, q *ast.Query) {
+func Where(opt types.ExprOption[User]) types.QueryOption[User] {
+	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		if sl.Where == nil {
 			sl.Where = &ast.Where{}
@@ -70,14 +68,14 @@ func Where(opt ExprOption) QueryOption {
 	}
 }
 
-func Limit(count int) QueryOption {
-	return func(s *common.State, q *ast.Query) {
+func Limit(count int) types.QueryOption[User] {
+	return func(s *types.State, q *ast.Query) {
 		q.Limit = query.BuildLimit(count)
 	}
 }
 
-func OrderBy(column string, dir ast.Direction) QueryOption {
-	return func(s *common.State, q *ast.Query) {
+func OrderBy(column string, dir ast.Direction) types.QueryOption[User] {
+	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{
 				Items: []*ast.OrderByItem{},
@@ -94,8 +92,8 @@ const (
 	OrderByName = "name"
 )
 
-func And(left, right ExprOption) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+func And(left, right types.ExprOption[User]) types.ExprOption[User] {
+	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
 		right(s, &rightExpr)
@@ -103,8 +101,8 @@ func And(left, right ExprOption) ExprOption {
 	}
 }
 
-func Or(left, right ExprOption) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+func Or(left, right types.ExprOption[User]) types.ExprOption[User] {
+	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
 		right(s, &rightExpr)
@@ -112,8 +110,8 @@ func Or(left, right ExprOption) ExprOption {
 	}
 }
 
-func Paren(inner ExprOption) ExprOption {
-	return func(s *common.State, expr *ast.Expr) {
+func Paren(inner types.ExprOption[User]) types.ExprOption[User] {
+	return func(s *types.State, expr *ast.Expr) {
 		var innerExpr ast.Expr
 		inner(s, &innerExpr)
 		*expr = query.BuildParenExpr(innerExpr)
