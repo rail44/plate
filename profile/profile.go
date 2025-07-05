@@ -3,8 +3,8 @@ package profile
 import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/hoge/common"
-	"github.com/rail44/hoge/query"
+	"github.com/rail44/plate/query"
+	"github.com/rail44/plate/common"
 )
 
 type ExprOption func(*common.State, *ast.Expr)

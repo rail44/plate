@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/hoge/common"
+	"github.com/rail44/plate/common"
 )
 
 // BuildLimit creates a Limit AST node

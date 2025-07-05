@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
 
-	"github.com/rail44/hoge/profile"
-	"github.com/rail44/hoge/user"
+	"github.com/rail44/plate/profile"
+	"github.com/rail44/plate/user"
 )
 
 func main() {

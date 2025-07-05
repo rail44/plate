@@ -3,9 +3,9 @@ package user
 import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/hoge/common"
-	"github.com/rail44/hoge/profile"
-	"github.com/rail44/hoge/query"
+	"github.com/rail44/plate/common"
+	"github.com/rail44/plate/profile"
+	"github.com/rail44/plate/query"
 )
 
 type ExprOption func(*common.State, *ast.Expr)
@@ -21,6 +21,10 @@ func Select(opts ...QueryOption) (string, []any) {
 		}
 	}
 	return query.BuildSelect("user", untyped)
+}
+
+type Joinable interface {
+	JoinProfile(whereOpt profile.ExprOption) QueryOption
 }
 
 func JoinProfile(whereOpt profile.ExprOption) QueryOption {

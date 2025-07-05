@@ -1,4 +1,4 @@
-module github.com/rail44/hoge
+module github.com/rail44/plate
 
 go 1.24.2
 
