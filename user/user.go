@@ -23,10 +23,6 @@ func Select(opts ...QueryOption) (string, []any) {
 	return query.BuildSelect("user", untyped)
 }
 
-type Joinable interface {
-	JoinProfile(whereOpt profile.ExprOption) QueryOption
-}
-
 func JoinProfile(whereOpt profile.ExprOption) QueryOption {
 	return QueryOption(query.BuildJoin(query.JoinConfig{
 		BaseTable:   "user",
@@ -39,8 +35,6 @@ func JoinProfile(whereOpt profile.ExprOption) QueryOption {
 		}
 	}))
 }
-
-
 
 func ID(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
@@ -94,7 +88,6 @@ func OrderBy(column string, dir ast.Direction) QueryOption {
 	}
 }
 
-
 // OrderBy column names
 const (
 	OrderByID   = "id"
@@ -126,4 +119,3 @@ func Paren(inner ExprOption) ExprOption {
 		*expr = query.BuildParenExpr(innerExpr)
 	}
 }
-

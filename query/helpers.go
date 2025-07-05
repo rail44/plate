@@ -126,12 +126,12 @@ type JoinConfig struct {
 func BuildJoin(config JoinConfig, whereOpt func(*common.State, *ast.Expr)) func(*common.State, *ast.Query) {
 	return func(s *common.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
-		
+
 		// Find available alias for target table
 		baseTableName := config.TargetTable
 		tableName := baseTableName
 		counter := 1
-		
+
 		// Check if table name is already used and find available alias
 		for {
 			if _, exists := s.Tables[tableName]; !exists {
@@ -140,13 +140,13 @@ func BuildJoin(config JoinConfig, whereOpt func(*common.State, *ast.Expr)) func(
 			tableName = fmt.Sprintf("%s%d", baseTableName, counter)
 			counter++
 		}
-		
+
 		// Add table to state
 		s.Tables[tableName] = struct{}{}
-		
+
 		// Save current working table alias
 		previousAlias := s.WorkingTableAlias
-		
+
 		// Create JOIN structure
 		join := &ast.Join{
 			Left: sl.From.Source,
@@ -174,26 +174,26 @@ func BuildJoin(config JoinConfig, whereOpt func(*common.State, *ast.Expr)) func(
 				},
 			},
 		}
-		
+
 		// Replace the FROM source with the JOIN
 		sl.From.Source = join
-		
+
 		// Apply WHERE condition if provided
 		if whereOpt != nil {
 			// Set working table alias for target table expressions
 			s.WorkingTableAlias = tableName
-			
+
 			// Create expression holder
 			var expr ast.Expr
 			whereOpt(s, &expr)
-			
+
 			// Only add WHERE clause if expression was actually set
 			if expr != nil {
 				// Initialize WHERE clause if not exists
 				if sl.Where == nil {
 					sl.Where = &ast.Where{}
 				}
-				
+
 				// If there's already a WHERE clause expression, combine with AND
 				if sl.Where.Expr != nil {
 					existingExpr := sl.Where.Expr
@@ -208,7 +208,7 @@ func BuildJoin(config JoinConfig, whereOpt func(*common.State, *ast.Expr)) func(
 					sl.Where.Expr = expr
 				}
 			}
-			
+
 			// Restore previous working table alias
 			s.WorkingTableAlias = previousAlias
 		}

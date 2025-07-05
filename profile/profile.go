@@ -3,8 +3,8 @@ package profile
 import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/plate/query"
 	"github.com/rail44/plate/common"
+	"github.com/rail44/plate/query"
 )
 
 type ExprOption func(*common.State, *ast.Expr)
@@ -47,7 +47,6 @@ func Where(opt ExprOption) QueryOption {
 		opt(s, &sl.Where.Expr)
 	}
 }
-
 
 func And(left, right ExprOption) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
@@ -98,4 +97,3 @@ const (
 	OrderByUserID = "user_id"
 	OrderByBio    = "bio"
 )
-
