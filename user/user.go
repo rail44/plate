@@ -79,21 +79,41 @@ const (
 	OrderByName = "name"
 )
 
-func And(left, right types.ExprOption[tables.User]) types.ExprOption[tables.User] {
-	return func(s *types.State, expr *ast.Expr) {
-		var leftExpr, rightExpr ast.Expr
-		left(s, &leftExpr)
-		right(s, &rightExpr)
-		*expr = query.BuildAndExpr(leftExpr, rightExpr)
-	}
-}
-
-func Or(left, right types.ExprOption[tables.User]) types.ExprOption[tables.User] {
-	return func(s *types.State, expr *ast.Expr) {
-		var leftExpr, rightExpr ast.Expr
-		left(s, &leftExpr)
-		right(s, &rightExpr)
-		*expr = query.BuildOrExpr(leftExpr, rightExpr)
+// Or creates an OR condition that can be used at the top level
+func Or(conditions ...types.ExprOption[tables.User]) types.QueryOption[tables.User] {
+	return func(s *types.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
+		
+		// Build the OR expression from all conditions
+		var orExpr ast.Expr
+		for i, cond := range conditions {
+			var expr ast.Expr
+			cond(s, &expr)
+			
+			if i == 0 {
+				orExpr = expr
+			} else {
+				orExpr = &ast.BinaryExpr{
+					Op:    ast.OpOr,
+					Left:  orExpr,
+					Right: expr,
+				}
+			}
+		}
+		
+		// Add to WHERE clause
+		if sl.Where == nil {
+			sl.Where = &ast.Where{Expr: orExpr}
+		} else if sl.Where.Expr == nil {
+			sl.Where.Expr = orExpr
+		} else {
+			// Combine with existing WHERE using AND
+			sl.Where.Expr = &ast.BinaryExpr{
+				Op:    ast.OpAnd,
+				Left:  sl.Where.Expr,
+				Right: &ast.ParenExpr{Expr: orExpr},
+			}
+		}
 	}
 }
 

@@ -81,6 +81,29 @@ func BuildColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName strin
 	}
 }
 
+// ConvertToQueryOption converts an ExprOption to a QueryOption by wrapping it in WHERE
+func ConvertToQueryOption[T types.Table](opt types.ExprOption[T]) types.QueryOption[T] {
+	return func(s *types.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
+		if sl.Where == nil {
+			sl.Where = &ast.Where{}
+		}
+		
+		if sl.Where.Expr == nil {
+			opt(s, &sl.Where.Expr)
+		} else {
+			// If WHERE already exists, combine with AND
+			var newExpr ast.Expr
+			opt(s, &newExpr)
+			sl.Where.Expr = &ast.BinaryExpr{
+				Op:    ast.OpAnd,
+				Left:  sl.Where.Expr,
+				Right: newExpr,
+			}
+		}
+	}
+}
+
 // BuildSelect creates a SELECT query with the given options
 func BuildSelect[T types.Table](opts []types.QueryOption[T]) (string, []any) {
 	var t T
@@ -117,8 +140,46 @@ func BuildSelect[T types.Table](opts []types.QueryOption[T]) (string, []any) {
 	return q.SQL(), s.Params
 }
 
-// Select is a generic select function for any table
-func Select[T types.Table](opts ...types.QueryOption[T]) (string, []any) {
+// Option represents either a QueryOption or an ExprOption
+type Option[T types.Table] interface {
+	Apply(*types.State, *ast.Query)
+}
+
+// queryOption wraps types.QueryOption to implement Option
+type queryOption[T types.Table] struct {
+	fn types.QueryOption[T]
+}
+
+func (q queryOption[T]) Apply(s *types.State, query *ast.Query) {
+	q.fn(s, query)
+}
+
+// exprOption wraps types.ExprOption to implement Option
+type exprOption[T types.Table] struct {
+	fn types.ExprOption[T]
+}
+
+func (e exprOption[T]) Apply(s *types.State, q *ast.Query) {
+	ConvertToQueryOption(e.fn)(s, q)
+}
+
+// Select is a generic select function for any table that accepts mixed options
+func Select[T types.Table](args ...interface{}) (string, []any) {
+	var opts []types.QueryOption[T]
+	
+	for _, arg := range args {
+		switch v := arg.(type) {
+		case types.QueryOption[T]:
+			opts = append(opts, v)
+		case types.ExprOption[T]:
+			opts = append(opts, ConvertToQueryOption(v))
+		case func(*types.State, *ast.Expr): // For direct function literals
+			opts = append(opts, ConvertToQueryOption[T](v))
+		default:
+			panic(fmt.Sprintf("unsupported option type: %T", v))
+		}
+	}
+	
 	return BuildSelect(opts)
 }
 

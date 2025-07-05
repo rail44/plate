@@ -34,17 +34,41 @@ func main() {
 	)
 	fmt.Printf("Profile->User JOIN with conditions: %s (params: %v)\n", sql4, params4)
 
-	// 既存のクエリ例
+	// Whereを省略した新しいスタイル
 	sql5, params5 := query.Select[tables.User](
-		user.Where(user.Name(ast.OpEqual, "John")),
+		user.Name(ast.OpEqual, "John"),
 		user.Limit(10),
 	)
 	fmt.Printf("SELECT with LIMIT: %s (params: %v)\n", sql5, params5)
 
 	sql6, params6 := query.Select[tables.User](
 		user.JoinProfile(profile.Bio(ast.OpEqual, "Engineer")),
-		user.Where(user.Name(ast.OpEqual, "John")),
+		user.Name(ast.OpEqual, "John"),
+		user.Email(ast.OpLike, "%@example.com"),
 		user.Limit(5),
 	)
-	fmt.Printf("JOIN with WHERE and LIMIT: %s (params: %v)\n", sql6, params6)
+	fmt.Printf("JOIN with multiple conditions: %s (params: %v)\n", sql6, params6)
+	
+	// シンプルなOR条件
+	sql7, params7 := query.Select[tables.User](
+		user.Or(
+			user.Name(ast.OpEqual, "John"),
+			user.Name(ast.OpEqual, "Jane"),
+			user.Name(ast.OpEqual, "Bob"),
+		),
+		user.ID(ast.OpGreater, "100"),
+		user.OrderBy("name", ast.DirectionAsc),
+	)
+	fmt.Printf("Simple OR condition: %s (params: %v)\n", sql7, params7)
+	
+	// 複雑な条件の組み合わせ
+	sql8, params8 := query.Select[tables.User](
+		user.Email(ast.OpLike, "%@company.com"),
+		user.Or(
+			user.Name(ast.OpEqual, "Admin"),
+			user.ID(ast.OpEqual, "1"),
+		),
+		user.Limit(1),
+	)
+	fmt.Printf("Complex mixed conditions: %s (params: %v)\n", sql8, params8)
 }
