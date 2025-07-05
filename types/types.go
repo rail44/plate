@@ -14,5 +14,6 @@ type Table interface {
 	TableName() string
 }
 
+
 type ExprOption[T Table] func(*State, *ast.Expr)
 type QueryOption[T Table] func(*State, *ast.Query)

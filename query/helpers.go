@@ -122,6 +122,7 @@ func Select[T types.Table](opts ...types.QueryOption[T]) (string, []any) {
 	return BuildSelect(opts)
 }
 
+
 // JoinConfig contains configuration for building JOIN clauses
 type JoinConfig struct {
 	BaseTable   string
