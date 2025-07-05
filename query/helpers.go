@@ -82,7 +82,10 @@ func BuildColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName strin
 }
 
 // BuildSelect creates a SELECT query with the given options
-func BuildSelect(tableName string, opts []func(*types.State, *ast.Query)) (string, []any) {
+func BuildSelect[T types.Table](opts []types.QueryOption[T]) (string, []any) {
+	var t T
+	tableName := t.TableName()
+	
 	s := &types.State{
 		Tables:            make(map[string]struct{}),
 		Params:            []any{},

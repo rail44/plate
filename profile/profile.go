@@ -9,14 +9,7 @@ import (
 )
 
 func Select(opts ...types.QueryOption[tables.Profile]) (string, []any) {
-	// Convert typed options to untyped for helper
-	untyped := make([]func(*types.State, *ast.Query), len(opts))
-	for i, opt := range opts {
-		untyped[i] = func(s *types.State, q *ast.Query) {
-			opt(s, q)
-		}
-	}
-	return query.BuildSelect("profile", untyped)
+	return query.BuildSelect(opts)
 }
 
 func JoinUser(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.Profile] {
