@@ -3,14 +3,12 @@ package user
 import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/plate/profile"
 	"github.com/rail44/plate/query"
+	"github.com/rail44/plate/tables"
 	"github.com/rail44/plate/types"
 )
 
-type User struct {}
-
-func Select(opts ...types.QueryOption[User]) (string, []any) {
+func Select(opts ...types.QueryOption[tables.User]) (string, []any) {
 	// Convert typed options to untyped for helper
 	untyped := make([]func(*types.State, *ast.Query), len(opts))
 	for i, opt := range opts {
@@ -21,8 +19,8 @@ func Select(opts ...types.QueryOption[User]) (string, []any) {
 	return query.BuildSelect("user", untyped)
 }
 
-func JoinProfile(whereOpt types.ExprOption[profile.Profile]) types.QueryOption[User] {
-	return types.QueryOption[User](query.BuildJoin(query.JoinConfig{
+func JoinProfile(whereOpt types.ExprOption[tables.Profile]) types.QueryOption[tables.User] {
+	return types.QueryOption[tables.User](query.BuildJoin(query.JoinConfig{
 		BaseTable:   "user",
 		TargetTable: "profile",
 		BaseKey:     "id",
@@ -34,7 +32,7 @@ func JoinProfile(whereOpt types.ExprOption[profile.Profile]) types.QueryOption[U
 	}))
 }
 
-func ID(op ast.BinaryOp, value string) types.ExprOption[User] {
+func ID(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -42,7 +40,7 @@ func ID(op ast.BinaryOp, value string) types.ExprOption[User] {
 	}
 }
 
-func Name(op ast.BinaryOp, value string) types.ExprOption[User] {
+func Name(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -50,7 +48,7 @@ func Name(op ast.BinaryOp, value string) types.ExprOption[User] {
 	}
 }
 
-func Email(op ast.BinaryOp, value string) types.ExprOption[User] {
+func Email(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -58,7 +56,7 @@ func Email(op ast.BinaryOp, value string) types.ExprOption[User] {
 	}
 }
 
-func Where(opt types.ExprOption[User]) types.QueryOption[User] {
+func Where(opt types.ExprOption[tables.User]) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		if sl.Where == nil {
@@ -68,13 +66,13 @@ func Where(opt types.ExprOption[User]) types.QueryOption[User] {
 	}
 }
 
-func Limit(count int) types.QueryOption[User] {
+func Limit(count int) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		q.Limit = query.BuildLimit(count)
 	}
 }
 
-func OrderBy(column string, dir ast.Direction) types.QueryOption[User] {
+func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{
@@ -92,7 +90,7 @@ const (
 	OrderByName = "name"
 )
 
-func And(left, right types.ExprOption[User]) types.ExprOption[User] {
+func And(left, right types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
@@ -101,7 +99,7 @@ func And(left, right types.ExprOption[User]) types.ExprOption[User] {
 	}
 }
 
-func Or(left, right types.ExprOption[User]) types.ExprOption[User] {
+func Or(left, right types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
@@ -110,7 +108,7 @@ func Or(left, right types.ExprOption[User]) types.ExprOption[User] {
 	}
 }
 
-func Paren(inner types.ExprOption[User]) types.ExprOption[User] {
+func Paren(inner types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		var innerExpr ast.Expr
 		inner(s, &innerExpr)

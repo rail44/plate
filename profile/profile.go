@@ -3,13 +3,12 @@ package profile
 import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"github.com/rail44/plate/types"
 	"github.com/rail44/plate/query"
+	"github.com/rail44/plate/tables"
+	"github.com/rail44/plate/types"
 )
 
-type Profile struct {}
-
-func Select(opts ...types.QueryOption[Profile]) (string, []any) {
+func Select(opts ...types.QueryOption[tables.Profile]) (string, []any) {
 	// Convert typed options to untyped for helper
 	untyped := make([]func(*types.State, *ast.Query), len(opts))
 	for i, opt := range opts {
@@ -20,7 +19,20 @@ func Select(opts ...types.QueryOption[Profile]) (string, []any) {
 	return query.BuildSelect("profile", untyped)
 }
 
-func UserID(op ast.BinaryOp, value string) types.ExprOption[Profile] {
+func JoinUser(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.Profile] {
+	return types.QueryOption[tables.Profile](query.BuildJoin(query.JoinConfig{
+		BaseTable:   "profile",
+		TargetTable: "user",
+		BaseKey:     "user_id",
+		TargetKey:   "id",
+	}, func(s *types.State, expr *ast.Expr) {
+		if whereOpt != nil {
+			whereOpt(s, expr)
+		}
+	}))
+}
+
+func UserID(op ast.BinaryOp, value string) types.ExprOption[tables.Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -28,7 +40,7 @@ func UserID(op ast.BinaryOp, value string) types.ExprOption[Profile] {
 	}
 }
 
-func Bio(op ast.BinaryOp, value string) types.ExprOption[Profile] {
+func Bio(op ast.BinaryOp, value string) types.ExprOption[tables.Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -36,7 +48,7 @@ func Bio(op ast.BinaryOp, value string) types.ExprOption[Profile] {
 	}
 }
 
-func Where(opt types.ExprOption[Profile]) types.QueryOption[Profile] {
+func Where(opt types.ExprOption[tables.Profile]) types.QueryOption[tables.Profile] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		if sl.Where == nil {
@@ -46,7 +58,7 @@ func Where(opt types.ExprOption[Profile]) types.QueryOption[Profile] {
 	}
 }
 
-func And(left, right types.ExprOption[Profile]) types.ExprOption[Profile] {
+func And(left, right types.ExprOption[tables.Profile]) types.ExprOption[tables.Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
@@ -55,7 +67,7 @@ func And(left, right types.ExprOption[Profile]) types.ExprOption[Profile] {
 	}
 }
 
-func Or(left, right types.ExprOption[Profile]) types.ExprOption[Profile] {
+func Or(left, right types.ExprOption[tables.Profile]) types.ExprOption[tables.Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		var leftExpr, rightExpr ast.Expr
 		left(s, &leftExpr)
@@ -64,7 +76,7 @@ func Or(left, right types.ExprOption[Profile]) types.ExprOption[Profile] {
 	}
 }
 
-func Paren(inner types.ExprOption[Profile]) types.ExprOption[Profile] {
+func Paren(inner types.ExprOption[tables.Profile]) types.ExprOption[tables.Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		var innerExpr ast.Expr
 		inner(s, &innerExpr)
@@ -72,13 +84,13 @@ func Paren(inner types.ExprOption[Profile]) types.ExprOption[Profile] {
 	}
 }
 
-func Limit(count int) types.QueryOption[Profile] {
+func Limit(count int) types.QueryOption[tables.Profile] {
 	return func(s *types.State, q *ast.Query) {
 		q.Limit = query.BuildLimit(count)
 	}
 }
 
-func OrderBy(column string, dir ast.Direction) types.QueryOption[Profile] {
+func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Profile] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{
