@@ -5,12 +5,13 @@ import (
 	"github.com/cloudspannerecosystem/memefish/ast"
 	"github.com/rail44/hoge/common"
 	"github.com/rail44/hoge/profile"
+	"github.com/rail44/hoge/query"
 )
 
 type ExprOption func(*common.State, *ast.Expr)
 type QueryOption func(*common.State, *ast.Query)
 
-func Select(opts ...QueryOption) string {
+func Select(opts ...QueryOption) (string, []any) {
 	tableName := "user"
 
 	s := &common.State{
@@ -21,7 +22,7 @@ func Select(opts ...QueryOption) string {
 	s.Tables[tableName] = struct{}{}
 
 	stmt := ast.Select{
-		Results: []ast.SelectItem {
+		Results: []ast.SelectItem{
 			&ast.Star{},
 		},
 		From: &ast.From{
@@ -33,15 +34,15 @@ func Select(opts ...QueryOption) string {
 		},
 	}
 
-	query := &ast.Query{
+	q := &ast.Query{
 		Query: &stmt,
 	}
 
 	for _, opt := range opts {
-		opt(s, query)
+		opt(s, q)
 	}
 
-	return query.SQL()
+	return q.SQL(), s.Params
 }
 
 func JoinProfile(whereOpt profile.ExprOption) QueryOption {
@@ -135,19 +136,7 @@ func ID(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-
-		*expr = &ast.BinaryExpr{
-			Left: &ast.Path{
-				Idents: []*ast.Ident{
-					{Name: s.WorkingTableAlias},
-					{Name: "id"},
-				},
-			},
-			Op: op,
-			Right: &ast.Param{
-				Name: fmt.Sprintf("p%d", i),
-			},
-		}
+		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -155,19 +144,7 @@ func Name(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-
-		*expr = &ast.BinaryExpr{
-			Left: &ast.Path{
-				Idents: []*ast.Ident{
-					{Name: s.WorkingTableAlias},
-					{Name: "name"},
-				},
-			},
-			Op: op,
-			Right: &ast.Param{
-				Name: fmt.Sprintf("p%d", i),
-			},
-		}
+		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "name", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -175,19 +152,7 @@ func Email(op ast.BinaryOp, value string) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-
-		*expr = &ast.BinaryExpr{
-			Left: &ast.Path{
-				Idents: []*ast.Ident{
-					{Name: s.WorkingTableAlias},
-					{Name: "email"},
-				},
-			},
-			Op: op,
-			Right: &ast.Param{
-				Name: fmt.Sprintf("p%d", i),
-			},
-		}
+		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "email", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -203,32 +168,19 @@ func Where(opt ExprOption) QueryOption {
 
 func Limit(count int) QueryOption {
 	return func(s *common.State, q *ast.Query) {
-		q.Limit = &ast.Limit{
-			Count: &ast.IntLiteral{
-				Value: fmt.Sprintf("%d", count),
-			},
-		}
+		q.Limit = query.BuildLimit(count)
 	}
 }
 
 func OrderBy(column string, dir ast.Direction) QueryOption {
 	return func(s *common.State, q *ast.Query) {
-		// Create or append to OrderBy
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{
 				Items: []*ast.OrderByItem{},
 			}
 		}
-		
-		q.OrderBy.Items = append(q.OrderBy.Items, &ast.OrderByItem{
-			Expr: &ast.Path{
-				Idents: []*ast.Ident{
-					{Name: s.WorkingTableAlias},
-					{Name: column},
-				},
-			},
-			Dir: dir,
-		})
+		q.OrderBy.Items = append(q.OrderBy.Items,
+			query.BuildOrderByItem(s.WorkingTableAlias, column, dir))
 	}
 }
 
@@ -240,32 +192,28 @@ const (
 )
 
 func And(left, right ExprOption) ExprOption {
-	return Paren(func(s *common.State, expr *ast.Expr) {
-		b := &ast.BinaryExpr{
-			Op: ast.OpAnd,
-		}
-		left(s, &b.Left)
-		right(s, &b.Right)
-		*expr = b
-	})
+	return func(s *common.State, expr *ast.Expr) {
+		var leftExpr, rightExpr ast.Expr
+		left(s, &leftExpr)
+		right(s, &rightExpr)
+		*expr = query.BuildAndExpr(leftExpr, rightExpr)
+	}
 }
 
 func Or(left, right ExprOption) ExprOption {
-	return Paren(func(s *common.State, expr *ast.Expr) {
-		b := &ast.BinaryExpr{
-			Op: ast.OpOr,
-		}
-		left(s, &b.Left)
-		right(s, &b.Right)
-		*expr = b
-	})
+	return func(s *common.State, expr *ast.Expr) {
+		var leftExpr, rightExpr ast.Expr
+		left(s, &leftExpr)
+		right(s, &rightExpr)
+		*expr = query.BuildOrExpr(leftExpr, rightExpr)
+	}
 }
 
 func Paren(inner ExprOption) ExprOption {
 	return func(s *common.State, expr *ast.Expr) {
-		paren := ast.ParenExpr{}
-		inner(s, &paren.Expr)
-		*expr = &paren
+		var innerExpr ast.Expr
+		inner(s, &innerExpr)
+		*expr = query.BuildParenExpr(innerExpr)
 	}
 }
 
