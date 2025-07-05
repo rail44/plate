@@ -117,6 +117,11 @@ func BuildSelect[T types.Table](opts []types.QueryOption[T]) (string, []any) {
 	return q.SQL(), s.Params
 }
 
+// Select is a generic select function for any table
+func Select[T types.Table](opts ...types.QueryOption[T]) (string, []any) {
+	return BuildSelect(opts)
+}
+
 // JoinConfig contains configuration for building JOIN clauses
 type JoinConfig struct {
 	BaseTable   string

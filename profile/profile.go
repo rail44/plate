@@ -8,10 +8,6 @@ import (
 	"github.com/rail44/plate/types"
 )
 
-func Select(opts ...types.QueryOption[tables.Profile]) (string, []any) {
-	return query.BuildSelect(opts)
-}
-
 func JoinUser(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.Profile] {
 	return types.QueryOption[tables.Profile](query.BuildJoin(query.JoinConfig{
 		BaseTable:   "profile",
