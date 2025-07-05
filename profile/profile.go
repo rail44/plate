@@ -11,37 +11,15 @@ type ExprOption func(*common.State, *ast.Expr)
 type QueryOption func(*common.State, *ast.Query)
 
 func Select(opts ...QueryOption) (string, []any) {
-	tableName := "profile"
-
-	s := &common.State{
-		Tables: make(map[string]struct{}),
-		Params: []any{},
-		WorkingTableAlias: tableName,
+	// Convert typed options to untyped for helper
+	untyped := make([]func(*common.State, *ast.Query), len(opts))
+	for i, opt := range opts {
+		opt := opt // capture loop variable
+		untyped[i] = func(s *common.State, q *ast.Query) {
+			opt(s, q)
+		}
 	}
-	s.Tables[tableName] = struct{}{}
-
-	stmt := ast.Select{
-		Results: []ast.SelectItem{
-			&ast.Star{},
-		},
-		From: &ast.From{
-			Source: &ast.TableName{
-				Table: &ast.Ident{
-					Name: tableName,
-				},
-			},
-		},
-	}
-
-	q := &ast.Query{
-		Query: &stmt,
-	}
-
-	for _, opt := range opts {
-		opt(s, q)
-	}
-
-	return q.SQL(), s.Params
+	return query.BuildSelect("profile", untyped)
 }
 
 func UserID(op ast.BinaryOp, value string) ExprOption {

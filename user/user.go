@@ -12,122 +12,28 @@ type ExprOption func(*common.State, *ast.Expr)
 type QueryOption func(*common.State, *ast.Query)
 
 func Select(opts ...QueryOption) (string, []any) {
-	tableName := "user"
-
-	s := &common.State{
-		Tables: make(map[string]struct{}),
-		Params: []any{},
-		WorkingTableAlias: tableName,
+	// Convert typed options to untyped for helper
+	untyped := make([]func(*common.State, *ast.Query), len(opts))
+	for i, opt := range opts {
+		opt := opt // capture loop variable
+		untyped[i] = func(s *common.State, q *ast.Query) {
+			opt(s, q)
+		}
 	}
-	s.Tables[tableName] = struct{}{}
-
-	stmt := ast.Select{
-		Results: []ast.SelectItem{
-			&ast.Star{},
-		},
-		From: &ast.From{
-			Source: &ast.TableName{
-				Table: &ast.Ident{
-					Name: tableName,
-				},
-			},
-		},
-	}
-
-	q := &ast.Query{
-		Query: &stmt,
-	}
-
-	for _, opt := range opts {
-		opt(s, q)
-	}
-
-	return q.SQL(), s.Params
+	return query.BuildSelect("user", untyped)
 }
 
 func JoinProfile(whereOpt profile.ExprOption) QueryOption {
-	return func(s *common.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-		// Find available alias for profile table
-		baseTableName := "profile"
-		tableName := baseTableName
-		counter := 1
-		
-		// Check if table name is already used and find available alias
-		for {
-			if _, exists := s.Tables[tableName]; !exists {
-				break
-			}
-			tableName = fmt.Sprintf("%s%d", baseTableName, counter)
-			counter++
-		}
-		
-		// Add table to state
-		s.Tables[tableName] = struct{}{}
-		
-		// Save current working table alias
-		previousAlias := s.WorkingTableAlias
-		
-		// Create JOIN structure
-		join := &ast.Join{
-			Left: sl.From.Source,
-			Op: ast.InnerJoin,
-			Right: &ast.TableName{
-				Table: &ast.Ident{
-					Name: tableName,
-				},
-			},
-			Cond: &ast.On{
-				Expr: &ast.BinaryExpr{
-					Left: &ast.Path{
-						Idents: []*ast.Ident{
-							{Name: "user"},
-							{Name: "id"},
-						},
-					},
-					Op: ast.OpEqual,
-					Right: &ast.Path{
-						Idents: []*ast.Ident{
-							{Name: tableName},
-							{Name: "user_id"},
-						},
-					},
-				},
-			},
-		}
-		
-		// Replace the FROM source with the JOIN
-		sl.From.Source = join
-		
-		// Apply WHERE condition if provided
+	return QueryOption(query.BuildJoin(query.JoinConfig{
+		BaseTable:   "user",
+		TargetTable: "profile",
+		BaseKey:     "id",
+		TargetKey:   "user_id",
+	}, func(s *common.State, expr *ast.Expr) {
 		if whereOpt != nil {
-			// Set working table alias for profile expressions
-			s.WorkingTableAlias = tableName
-			
-			// Initialize WHERE clause if not exists
-			if sl.Where == nil {
-				sl.Where = &ast.Where{}
-			}
-			
-			// If there's already a WHERE clause expression, combine with AND
-			if sl.Where.Expr != nil {
-				existingExpr := sl.Where.Expr
-				and := &ast.BinaryExpr{
-					Op: ast.OpAnd,
-					Left: existingExpr,
-				}
-				whereOpt(s, &and.Right)
-				sl.Where.Expr = &ast.ParenExpr{
-					Expr: and,
-				}
-			} else {
-				whereOpt(s, &sl.Where.Expr)
-			}
-			
-			// Restore previous working table alias
-			s.WorkingTableAlias = previousAlias
+			whereOpt(s, expr)
 		}
-	}
+	}))
 }
 
 
