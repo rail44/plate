@@ -4,7 +4,7 @@ Plate is a type-safe SQL query builder for Go, designed to work with Google Clou
 
 ## Overview
 
-Plate provides strongly-typed query builders with compile-time safety for SQL query construction. The API uses a combination of method chaining for column operations and functional options for query structure.
+Plate provides strongly-typed query builders with compile-time safety for SQL query construction. The API uses a combination of method chaining for column operations and functional options for query structure. Query builders can be automatically generated from your table schemas.
 
 ```go
 // Type-safe query construction with fluent Column API
@@ -52,6 +52,11 @@ user.ID().Between("1", "100")    // Correct string type matching
 - **Many-to-Many**: `post.Tags()` through junction tables
 - **Belongs-To**: `post.Author()` with INNER JOIN by default
 - **JOIN Type Control**: `WithInnerJoin()` to override default JOIN types
+
+### 🚀 **Code Generation**
+- **Automatic Query Builder Generation**: Generate type-safe query builders from table schemas
+- **Relationship Inference**: Automatically generate relationship methods from foreign keys
+- **Flexible Configuration**: Support for custom relationships and junction tables
 
 ## Design Philosophy
 
@@ -123,6 +128,15 @@ sql, params := query.Select[tables.User](
             user.Email().Like("%@company.com"),
         ),
     ),
+)
+
+// Negation with NOT
+sql, params := query.Select[tables.User](
+    user.Not(user.Name().Like("Admin%")),  // NOT (name LIKE 'Admin%')
+    user.Not(user.Or(                      // NOT (name = 'John' OR name = 'Jane')
+        user.Name().Eq("John"),
+        user.Name().Eq("Jane"),
+    )),
 )
 ```
 
@@ -210,26 +224,114 @@ user.Name().In("John", "Jane")   // string list
 // user.ID().Between(1, 100)     // Type mismatch if ID is defined as string
 ```
 
+## Code Generation
+
+Plate includes a powerful code generator that creates type-safe query builders from your table schemas.
+
+### Generator Configuration
+
+```go
+import (
+    "github.com/rail44/plate"
+    "myapp/models"
+)
+
+config := plate.GeneratorConfig{
+    Tables: []plate.TableConfig{
+        {
+            Schema: plate.TableSchema{
+                TableName: "user",
+                Model:     models.User{},
+            },
+            Relations: []plate.Relation{
+                {
+                    Name:        "Posts",
+                    Target:      "Post",
+                    From:        "ID",
+                    To:          "UserID",
+                    ReverseName: "Author",
+                },
+            },
+        },
+        {
+            Schema: plate.TableSchema{
+                TableName: "post",
+                Model:     models.Post{},
+            },
+            Relations: []plate.Relation{
+                {
+                    Name:   "Author",
+                    Target: "User",
+                    From:   "UserID",
+                    To:     "ID",
+                },
+            },
+        },
+    },
+    Junctions: []plate.JunctionConfig{
+        {
+            Schema: plate.TableSchema{
+                TableName: "post_tag",
+                Model:     models.PostTag{},
+            },
+            Relations: []plate.Relation{
+                {
+                    Name:        "Post",
+                    Target:      "Post",
+                    From:        "PostID",
+                    To:          "ID",
+                    ReverseName: "Tags",
+                },
+                {
+                    Name:        "Tag",
+                    Target:      "Tag",
+                    From:        "TagID",
+                    To:          "ID",
+                    ReverseName: "Posts",
+                },
+            },
+        },
+    },
+}
+
+// Generate query builders
+generator := plate.NewGenerator()
+files, err := generator.Generate(config, "./generated")
+```
+
+### Generated Structure
+
+The generator creates the following structure:
+
+```
+generated/
+├── tables/         # Table type definitions
+│   └── tables.go
+├── user/           # User table query builder
+│   └── user.go
+├── post/           # Post table query builder  
+│   └── post.go
+└── tag/            # Tag table query builder
+    └── tag.go
+```
+
+Each generated query builder includes:
+- Type-safe column accessors
+- All column operations (Eq, Like, Between, etc.)
+- Relationship methods based on foreign keys
+- Query options (OrderBy, Limit, etc.)
+- Boolean logic helpers (And, Or, Not)
+
 ## Project Structure
 
 ```
-├── tables/         # Table type definitions
+plate/
+├── generator.go    # Code generator implementation
+├── templates.go    # Query builder templates
 ├── types/          # Core types (Column, State, Options)
-├── user/           # User table query builder
-├── post/           # Post table query builder  
-├── tag/            # Tag table query builder
-├── post_tag/       # Junction table definitions
-├── query/          # Generic Select function and helpers
-└── docs/plan/      # Design documents
+├── query/          # Generic query functions and helpers
+└── docs/           # Documentation and design decisions
 ```
-
-## Future: Code Generation
-
-Currently, the query builders are hand-written to validate the design and establish patterns. Once the API is stable, we plan to generate them automatically from Cloud Spanner schema definitions.
-
-This template-based approach ensures that generated code follows consistent patterns and maintains the same level of type safety and usability.
-
-See [docs/plan/](docs/plan/) for detailed design decisions and future plans.
 
 ## Dependencies
 

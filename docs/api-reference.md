@@ -95,7 +95,7 @@ func OrderBy[V any](column Column[T, V], dir ast.Direction) QueryOption[T]
 ```
 
 **Direction Constants:**
-- `ast.DirectionAsc` - Ascending order
+- `ast.DirectionAsc` - Ascending order  
 - `ast.DirectionDesc` - Descending order
 
 **Examples:**
@@ -180,6 +180,35 @@ func And(opts ...ExprOption[T]) ExprOption[T]
 ```
 
 Used for grouping conditions within OR operations.
+
+### NOT Operations
+
+```go
+func Not(opt ExprOption[T]) ExprOption[T]
+```
+
+Creates a logical NOT condition that wraps any ExprOption. This allows negation of complex expressions including And() and Or() combinations.
+
+**Examples:**
+```go
+// Simple NOT
+user.Not(user.Name().Like("Admin%"))
+// WHERE NOT (user.name LIKE @p0)
+
+// NOT with OR
+user.Not(user.Or(
+    user.Name().Eq("John"),
+    user.Name().Eq("Jane"),
+))
+// WHERE NOT (user.name = @p0 OR user.name = @p1)
+
+// Complex NOT with AND/OR
+user.Not(user.And(
+    user.Name().Like("Admin%"),
+    user.Email().Like("%@admin.com"),
+))
+// WHERE NOT (user.name LIKE @p0 AND user.email LIKE @p1)
+```
 
 ## Relationship Methods
 
@@ -347,4 +376,101 @@ user.Or(
     user.And(condition1, condition2),
     user.And(condition3, condition4),
 )
+```
+
+## Code Generator API
+
+### GeneratorConfig
+
+```go
+type GeneratorConfig struct {
+    Tables    []TableConfig
+    Junctions []JunctionConfig
+}
+```
+
+The main configuration structure for the code generator.
+
+### TableConfig
+
+```go
+type TableConfig struct {
+    Schema    TableSchema
+    Relations []Relation
+}
+```
+
+Represents a table that needs a query builder.
+
+### JunctionConfig
+
+```go
+type JunctionConfig struct {
+    Schema    TableSchema
+    Relations []Relation // Must have exactly 2 relations
+}
+```
+
+Represents a junction table for many-to-many relationships.
+
+### TableSchema
+
+```go
+type TableSchema struct {
+    TableName string      // Database table name (e.g., "user")
+    Model     interface{} // Model instance (e.g., models.User{})
+}
+```
+
+Contains the basic information about a table.
+
+### Relation
+
+```go
+type Relation struct {
+    Name        string // Relationship name (e.g., "Author")
+    Target      string // Target table name (e.g., "User")
+    From        string // Source column (e.g., "UserID")
+    To          string // Target column (e.g., "ID")
+    ReverseName string // Optional: Name for the reverse relation
+}
+```
+
+Represents a relationship between tables.
+
+### Generator Methods
+
+```go
+func NewGenerator() *Generator
+```
+
+Creates a new Generator instance.
+
+```go
+func (g *Generator) Generate(config GeneratorConfig, outputDir string) (GeneratedFiles, error)
+```
+
+Generates query builder code based on the provided configuration.
+
+**Parameters:**
+- `config`: The generator configuration
+- `outputDir`: Directory where generated files will be written
+
+**Returns:**
+- `GeneratedFiles`: Map of relative file paths to file contents
+- `error`: Any error that occurred during generation
+
+### Usage Example
+
+```go
+generator := plate.NewGenerator()
+files, err := generator.Generate(config, "./generated")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Write generated files to disk
+for path, content := range files.Files {
+    // Write content to path
+}
 ```
