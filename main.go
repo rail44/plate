@@ -109,4 +109,42 @@ func main() {
 		post.OrderBy("title", ast.DirectionAsc),
 	)
 	fmt.Printf("All posts with their tags (including posts without tags): %s (params: %v)\n", sql18, params18)
+	
+	// 多段JOINの例
+	fmt.Println("\n--- Multi-level JOIN Examples ---")
+	
+	// 特定のユーザーの投稿とそのタグを全て取得
+	sql19, params19 := query.Select[tables.User](
+		user.Email(ast.OpEqual, "john@example.com"),
+		user.Posts(
+			post.Tags(),
+			post.OrderBy("created_at", ast.DirectionDesc),
+		),
+	)
+	fmt.Printf("User with all their posts and tags: %s (params: %v)\n", sql19, params19)
+	
+	// 特定のタグを持つ投稿を書いたユーザーを検索（多段JOIN）
+	sql20, params20 := query.Select[tables.User](
+		user.Posts(
+			post.Tags(
+				tag.Name(ast.OpEqual, "Go"),
+			),
+			post.Title(ast.OpLike, "%tutorial%"),
+		),
+		user.OrderBy("name", ast.DirectionAsc),
+	)
+	fmt.Printf("Users who wrote Go tutorials: %s (params: %v)\n", sql20, params20)
+	
+	// タグから投稿、そして著者情報まで辿る多段JOIN
+	sql21, params21 := query.Select[tables.Tag](
+		tag.Name(ast.OpLike, "tech%"),
+		tag.Posts(
+			post.Author(
+				user.Email(ast.OpLike, "%@company.com"),
+			),
+			post.Title(ast.OpLike, "%announcement%"),
+		),
+		tag.OrderBy("name", ast.DirectionAsc),
+	)
+	fmt.Printf("Tech tags used in company announcements: %s (params: %v)\n", sql21, params21)
 }
