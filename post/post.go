@@ -13,9 +13,8 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
-		// Find available alias for target table using semantic naming
-		tableName := query.FindSemanticAlias(s, "user", "author")
-		s.Tables[tableName] = struct{}{}
+		// Register alias for target table using semantic naming
+		tableName := s.RegisterTableAlias("user", "author")
 		
 		// Create and apply JOIN
 		sl.From.Source = query.Join(query.JoinConfig{
@@ -116,12 +115,9 @@ func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
-		// Find available aliases for junction and target tables
-		junctionAlias := query.FindSemanticAlias(s, "post_tag", "post_tags_junction")
-		s.Tables[junctionAlias] = struct{}{}
-		
-		targetAlias := query.FindSemanticAlias(s, "tag", "tags")
-		s.Tables[targetAlias] = struct{}{}
+		// Register aliases for junction and target tables
+		junctionAlias := s.RegisterTableAlias("post_tag", "post_tags_junction")
+		targetAlias := s.RegisterTableAlias("tag", "tags")
 		
 		// Create and apply JOIN
 		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{

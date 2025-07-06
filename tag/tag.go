@@ -67,12 +67,9 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
-		// Find available aliases for junction and target tables
-		junctionAlias := query.FindSemanticAlias(s, "post_tag", "tag_posts_junction")
-		s.Tables[junctionAlias] = struct{}{}
-		
-		targetAlias := query.FindSemanticAlias(s, "post", "posts")
-		s.Tables[targetAlias] = struct{}{}
+		// Register aliases for junction and target tables
+		junctionAlias := s.RegisterTableAlias("post_tag", "tag_posts_junction")
+		targetAlias := s.RegisterTableAlias("post", "posts")
 		
 		// Create and apply JOIN
 		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{

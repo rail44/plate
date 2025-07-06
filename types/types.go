@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
 )
 
@@ -8,6 +9,41 @@ type State struct {
 	Tables            map[string]struct{}
 	Params            []any
 	WorkingTableAlias string
+}
+
+// RegisterTableAlias finds an available alias based on the relationship context and registers it
+func (s *State) RegisterTableAlias(tableName, relationshipName string) string {
+	// Use relationship name as the base alias
+	baseAlias := relationshipName
+	if baseAlias == "" {
+		baseAlias = tableName
+	}
+	
+	// Check if the base alias is available
+	if _, exists := s.Tables[baseAlias]; !exists {
+		s.Tables[baseAlias] = struct{}{}
+		return baseAlias
+	}
+	
+	// If not, try with context prefix
+	if s.WorkingTableAlias != "" && s.WorkingTableAlias != tableName {
+		contextAlias := fmt.Sprintf("%s_%s", s.WorkingTableAlias, baseAlias)
+		if _, exists := s.Tables[contextAlias]; !exists {
+			s.Tables[contextAlias] = struct{}{}
+			return contextAlias
+		}
+	}
+	
+	// Fall back to numbered suffix
+	counter := 1
+	for {
+		numberedAlias := fmt.Sprintf("%s%d", baseAlias, counter)
+		if _, exists := s.Tables[numberedAlias]; !exists {
+			s.Tables[numberedAlias] = struct{}{}
+			return numberedAlias
+		}
+		counter++
+	}
 }
 
 type Table interface {
