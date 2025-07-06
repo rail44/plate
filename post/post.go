@@ -53,7 +53,7 @@ func Content() types.Column[tables.Post, string] {
 
 
 func Limit(count int) types.QueryOption[tables.Post] {
-	return query.LimitOption[tables.Post](count)
+	return query.Limit[tables.Post](count)
 }
 
 // And creates an AND condition that groups multiple conditions

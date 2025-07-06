@@ -7,43 +7,7 @@ import (
 	"github.com/rail44/plate/types"
 )
 
-// Limit creates a Limit AST node
-func Limit(count int) *ast.Limit {
-	return &ast.Limit{
-		Count: &ast.IntLiteral{
-			Value: fmt.Sprintf("%d", count),
-		},
-	}
-}
 
-// OrderByItem creates an OrderByItem AST node
-func OrderByItem(tableAlias, column string, dir ast.Direction) *ast.OrderByItem {
-	return &ast.OrderByItem{
-		Expr: &ast.Path{
-			Idents: []*ast.Ident{
-				{Name: tableAlias},
-				{Name: column},
-			},
-		},
-		Dir: dir,
-	}
-}
-
-// ColumnExpr creates a column reference expression with parameter
-func ColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName string) ast.Expr {
-	return &ast.BinaryExpr{
-		Left: &ast.Path{
-			Idents: []*ast.Ident{
-				{Name: tableAlias},
-				{Name: column},
-			},
-		},
-		Op: op,
-		Right: &ast.Param{
-			Name: paramName,
-		},
-	}
-}
 
 // And creates an AND condition that groups multiple conditions
 func And[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
@@ -243,7 +207,15 @@ func OrderBy[T types.Table, V any](column types.Column[T, V], dir ast.Direction)
 				Items: []*ast.OrderByItem{},
 			}
 		}
-		q.OrderBy.Items = append(q.OrderBy.Items, OrderByItem(s.CurrentAlias(), column.Name, dir))
+		q.OrderBy.Items = append(q.OrderBy.Items, &ast.OrderByItem{
+			Expr: &ast.Path{
+				Idents: []*ast.Ident{
+					{Name: s.CurrentAlias()},
+					{Name: column.Name},
+				},
+			},
+			Dir: dir,
+		})
 	}
 }
 
@@ -262,10 +234,14 @@ func Not[T types.Table](opt types.ExprOption[T]) types.ExprOption[T] {
 	}
 }
 
-// LimitOption creates a LIMIT clause for any table type
-func LimitOption[T types.Table](count int) types.QueryOption[T] {
+// Limit creates a LIMIT clause for any table type
+func Limit[T types.Table](count int) types.QueryOption[T] {
 	return func(s *types.State, q *ast.Query) {
-		q.Limit = Limit(count)
+		q.Limit = &ast.Limit{
+			Count: &ast.IntLiteral{
+				Value: fmt.Sprintf("%d", count),
+			},
+		}
 	}
 }
 

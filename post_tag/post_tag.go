@@ -21,7 +21,7 @@ func CreatedAt() types.Column[tables.PostTag, string] {
 }
 
 func Limit(count int) types.QueryOption[tables.PostTag] {
-	return query.LimitOption[tables.PostTag](count)
+	return query.Limit[tables.PostTag](count)
 }
 
 func OrderBy[V any](column types.Column[tables.PostTag, V], dir ast.Direction) types.QueryOption[tables.PostTag] {

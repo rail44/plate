@@ -17,7 +17,7 @@ func Name() types.Column[tables.Tag, string] {
 }
 
 func Limit(count int) types.QueryOption[tables.Tag] {
-	return query.LimitOption[tables.Tag](count)
+	return query.Limit[tables.Tag](count)
 }
 
 func OrderBy[V any](column types.Column[tables.Tag, V], dir ast.Direction) types.QueryOption[tables.Tag] {

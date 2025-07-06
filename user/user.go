@@ -22,7 +22,7 @@ func Email() types.Column[tables.User, string] {
 
 
 func Limit(count int) types.QueryOption[tables.User] {
-	return query.LimitOption[tables.User](count)
+	return query.Limit[tables.User](count)
 }
 
 func OrderBy[V any](column types.Column[tables.User, V], dir ast.Direction) types.QueryOption[tables.User] {
