@@ -100,15 +100,13 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
 		})
 		
 		// Apply options with the target table alias
-		if len(opts) > 0 {
-			previousAlias := s.WorkingTableAlias
-			s.WorkingTableAlias = targetAlias
-			
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-			
-			s.WorkingTableAlias = previousAlias
+		previousAlias := s.WorkingTableAlias
+		s.WorkingTableAlias = targetAlias
+		
+		for _, opt := range opts {
+			opt.Apply(s, q)
 		}
+		
+		s.WorkingTableAlias = previousAlias
 	}
 }

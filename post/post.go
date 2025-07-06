@@ -29,16 +29,14 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 		})
 		
 		// Apply options with the target table alias
-		if len(opts) > 0 {
-			previousAlias := s.WorkingTableAlias
-			s.WorkingTableAlias = tableName
-			
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-			
-			s.WorkingTableAlias = previousAlias
+		previousAlias := s.WorkingTableAlias
+		s.WorkingTableAlias = tableName
+		
+		for _, opt := range opts {
+			opt.Apply(s, q)
 		}
+		
+		s.WorkingTableAlias = previousAlias
 	}
 }
 
@@ -151,15 +149,13 @@ func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 		})
 		
 		// Apply options with the target table alias
-		if len(opts) > 0 {
-			previousAlias := s.WorkingTableAlias
-			s.WorkingTableAlias = targetAlias
-			
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-			
-			s.WorkingTableAlias = previousAlias
+		previousAlias := s.WorkingTableAlias
+		s.WorkingTableAlias = targetAlias
+		
+		for _, opt := range opts {
+			opt.Apply(s, q)
 		}
+		
+		s.WorkingTableAlias = previousAlias
 	}
 }
