@@ -107,30 +107,24 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
-		// 現在のパスを保存してからリレーションシップを登録
-		basePath := make([]string, len(s.RelationshipPath))
-		copy(basePath, s.RelationshipPath)
 		baseAlias := s.CurrentAlias()
 
-		// Register relationship
-		tableName := s.RegisterRelationship("posts")
+		s.WithRelationship("posts", func(alias string) {
+			// Create and apply JOIN
+			sl.From.Source = query.Join(query.JoinConfig{
+				Source:      sl.From.Source,
+				BaseTable:   baseAlias,
+				TargetTable: "post",
+				TargetAlias: alias,
+				BaseKey:     "id",
+				TargetKey:   "user_id",
+				JoinType:    ast.LeftOuterJoin,
+			})
 
-		// Create and apply JOIN
-		sl.From.Source = query.Join(query.JoinConfig{
-			Source:      sl.From.Source,
-			BaseTable:   baseAlias,
-			TargetTable: "post",
-			TargetAlias: tableName,
-			BaseKey:     "id",
-			TargetKey:   "user_id",
-			JoinType:    ast.LeftOuterJoin,
+			// Apply options
+			for _, opt := range opts {
+				opt.Apply(s, q)
+			}
 		})
-
-		// Apply options with the target table alias
-		for _, opt := range opts {
-			opt.Apply(s, q)
-		}
-
-		s.RelationshipPath = basePath
 	}
 }

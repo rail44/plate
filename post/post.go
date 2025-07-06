@@ -13,32 +13,25 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
-		// 現在のパスを保存してからリレーションシップを登録
-		basePath := make([]string, len(s.RelationshipPath))
-		copy(basePath, s.RelationshipPath)
 		baseAlias := s.CurrentAlias()
-		
-		// Register relationship
-		tableName := s.RegisterRelationship("author")
 
-		// Create and apply JOIN
-		sl.From.Source = query.Join(query.JoinConfig{
-			Source:      sl.From.Source,
-			BaseTable:   baseAlias,
-			TargetTable: "user",
-			TargetAlias: tableName,
-			BaseKey:     "user_id",
-			TargetKey:   "id",
-			JoinType:    ast.InnerJoin,
+		s.WithRelationship("author", func(alias string) {
+			// Create and apply JOIN
+			sl.From.Source = query.Join(query.JoinConfig{
+				Source:      sl.From.Source,
+				BaseTable:   baseAlias,
+				TargetTable: "user",
+				TargetAlias: alias,
+				BaseKey:     "user_id",
+				TargetKey:   "id",
+				JoinType:    ast.InnerJoin,
+			})
+
+			// Apply options
+			for _, opt := range opts {
+				opt.Apply(s, q)
+			}
 		})
-
-		// Apply options with the target table alias
-
-		for _, opt := range opts {
-			opt.Apply(s, q)
-		}
-
-		s.RelationshipPath = basePath
 	}
 }
 
@@ -117,46 +110,39 @@ func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
-		// 現在のパスを保存してからリレーションシップを登録
-		basePath := make([]string, len(s.RelationshipPath))
-		copy(basePath, s.RelationshipPath)
 		baseAlias := s.CurrentAlias()
+		junctionAlias := s.RegisterJunction("post_tag")
 
-		// Register aliases for junction and target tables
-		junctionAlias := s.RegisterJunctionTable("post_tag")
-		targetAlias := s.RegisterRelationship("tags")
+		s.WithRelationship("tags", func(targetAlias string) {
+			// Create and apply JOIN
+			sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
+				Source:        sl.From.Source,
+				BaseTable:     baseAlias,
+				JunctionTable: "post_tag",
+				JunctionAlias: junctionAlias,
+				TargetTable:   "tag",
+				TargetAlias:   targetAlias,
+				BaseToJunction: struct {
+					BaseKey     string
+					JunctionKey string
+				}{
+					BaseKey:     "id",
+					JunctionKey: "post_id",
+				},
+				JunctionToTarget: struct {
+					JunctionKey string
+					TargetKey   string
+				}{
+					JunctionKey: "tag_id",
+					TargetKey:   "id",
+				},
+				JoinType: ast.LeftOuterJoin,
+			})
 
-		// Create and apply JOIN
-		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
-			Source:        sl.From.Source,
-			BaseTable:     baseAlias,
-			JunctionTable: "post_tag",
-			JunctionAlias: junctionAlias,
-			TargetTable:   "tag",
-			TargetAlias:   targetAlias,
-			BaseToJunction: struct {
-				BaseKey     string
-				JunctionKey string
-			}{
-				BaseKey:     "id",
-				JunctionKey: "post_id",
-			},
-			JunctionToTarget: struct {
-				JunctionKey string
-				TargetKey   string
-			}{
-				JunctionKey: "tag_id",
-				TargetKey:   "id",
-			},
-			JoinType: ast.LeftOuterJoin,
+			// Apply options
+			for _, opt := range opts {
+				opt.Apply(s, q)
+			}
 		})
-
-		// Apply options with the target table alias
-
-		for _, opt := range opts {
-			opt.Apply(s, q)
-		}
-
-		s.RelationshipPath = basePath
 	}
 }

@@ -11,8 +11,8 @@ type State struct {
 	RelationshipPath []string // リレーションシップのパスを記録
 }
 
-// RegisterRelationship リレーションシップを辿ってエイリアスを登録
-func (s *State) RegisterRelationship(relationshipName string) string {
+// registerRelationship リレーションシップを辿ってエイリアスを登録
+func (s *State) registerRelationship(relationshipName string) string {
 	// パスに追加
 	s.RelationshipPath = append(s.RelationshipPath, relationshipName)
 	
@@ -23,8 +23,8 @@ func (s *State) RegisterRelationship(relationshipName string) string {
 	return alias
 }
 
-// RegisterJunctionTable 中間テーブル用（パスを進めずにエイリアスだけ生成）
-func (s *State) RegisterJunctionTable(tableName string) string {
+// RegisterJunction 中間テーブル用（パスを進めずにエイリアスだけ生成）
+func (s *State) RegisterJunction(tableName string) string {
 	// 現在のエイリアスに基づいた中間テーブル名を生成
 	currentAlias := s.CurrentAlias()
 	alias := ""
@@ -49,6 +49,23 @@ func (s *State) CurrentAlias() string {
 	}
 	// 2要素以上の場合は先頭を除いて結合
 	return strings.Join(s.RelationshipPath[1:], "_")
+}
+
+// WithRelationship リレーションシップのスコープ内で処理を実行
+// 注：このメソッドは主にJOINメソッドの実装で使用することを想定しています
+func (s *State) WithRelationship(relationshipName string, fn func(alias string)) {
+	// パスを保存
+	basePath := make([]string, len(s.RelationshipPath))
+	copy(basePath, s.RelationshipPath)
+	
+	// リレーションシップを登録
+	alias := s.registerRelationship(relationshipName)
+	
+	// スコープ内で処理を実行
+	fn(alias)
+	
+	// パスを復元
+	s.RelationshipPath = basePath
 }
 
 type Table interface {

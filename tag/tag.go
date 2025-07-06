@@ -67,45 +67,39 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
-		// 現在のパスを保存してからリレーションシップを登録
-		basePath := make([]string, len(s.RelationshipPath))
-		copy(basePath, s.RelationshipPath)
 		baseAlias := s.CurrentAlias()
+		junctionAlias := s.RegisterJunction("post_tag")
 
-		// Register aliases for junction and target tables
-		junctionAlias := s.RegisterJunctionTable("post_tag")
-		targetAlias := s.RegisterRelationship("posts")
+		s.WithRelationship("posts", func(targetAlias string) {
+			// Create and apply JOIN
+			sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
+				Source:        sl.From.Source,
+				BaseTable:     baseAlias,
+				JunctionTable: "post_tag",
+				JunctionAlias: junctionAlias,
+				TargetTable:   "post",
+				TargetAlias:   targetAlias,
+				BaseToJunction: struct {
+					BaseKey     string
+					JunctionKey string
+				}{
+					BaseKey:     "id",
+					JunctionKey: "tag_id",
+				},
+				JunctionToTarget: struct {
+					JunctionKey string
+					TargetKey   string
+				}{
+					JunctionKey: "post_id",
+					TargetKey:   "id",
+				},
+				JoinType: ast.LeftOuterJoin,
+			})
 
-		// Create and apply JOIN
-		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
-			Source:        sl.From.Source,
-			BaseTable:     baseAlias,
-			JunctionTable: "post_tag",
-			JunctionAlias: junctionAlias,
-			TargetTable:   "post",
-			TargetAlias:   targetAlias,
-			BaseToJunction: struct {
-				BaseKey     string
-				JunctionKey string
-			}{
-				BaseKey:     "id",
-				JunctionKey: "tag_id",
-			},
-			JunctionToTarget: struct {
-				JunctionKey string
-				TargetKey   string
-			}{
-				JunctionKey: "post_id",
-				TargetKey:   "id",
-			},
-			JoinType: ast.LeftOuterJoin,
+			// Apply options
+			for _, opt := range opts {
+				opt.Apply(s, q)
+			}
 		})
-
-		// Apply options with the target table alias
-		for _, opt := range opts {
-			opt.Apply(s, q)
-		}
-
-		s.RelationshipPath = basePath
 	}
 }
