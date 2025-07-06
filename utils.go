@@ -31,14 +31,3 @@ func toSnakeCase(s string) string {
 	}
 	return result.String()
 }
-
-// toCamelCase converts a snake_case string to CamelCase
-func toCamelCase(s string) string {
-	parts := strings.Split(s, "_")
-	for i, part := range parts {
-		if part != "" {
-			parts[i] = strings.ToUpper(part[:1]) + part[1:]
-		}
-	}
-	return strings.Join(parts, "")
-}
