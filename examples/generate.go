@@ -31,6 +31,7 @@ func main() {
 	
 	// Configure generator
 	config := plate.GeneratorConfig{
+		TablesImportPath: "github.com/rail44/plate/examples/generated/tables",
 		Tables: []plate.TableConfig{
 			{
 				Schema: userSchema,

@@ -9,6 +9,9 @@ import (
 type GeneratorConfig struct {
 	Tables    []TableConfig
 	Junctions []JunctionConfig
+	// TablesImportPath specifies the import path for the generated tables package
+	// If empty, defaults to github.com/rail44/plate/tables
+	TablesImportPath string
 }
 
 // TableConfig represents a table that needs a query builder
@@ -273,7 +276,7 @@ func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]Tab
 	imports := []string{
 		"github.com/cloudspannerecosystem/memefish/ast",
 		g.getBaseImportPath() + "/query",
-		g.getBaseImportPath() + "/tables",
+		g.getTablesImportPath(),
 		g.getBaseImportPath() + "/types",
 	}
 	
@@ -317,6 +320,16 @@ func (g *Generator) getBaseImportPath() string {
 	
 	// Fallback to the package path as-is
 	return pkgPath
+}
+
+// getTablesImportPath returns the import path for the generated tables package
+func (g *Generator) getTablesImportPath() string {
+	if g.config.TablesImportPath != "" {
+		return g.config.TablesImportPath
+	}
+	
+	// Default to plate's own tables package
+	return g.getBaseImportPath() + "/tables"
 }
 
 // lastIndex finds the last occurrence of substr in s
