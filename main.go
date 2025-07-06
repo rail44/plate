@@ -158,4 +158,31 @@ func main() {
 		tag.OrderBy("name", ast.DirectionAsc),
 	)
 	printExample("Tag → Posts → User (reverse navigation)", sql12, params12)
+
+	sql13, params13 := query.Select[tables.Post](
+		post.Or(
+			post.ID(ast.OpEqual, "12345"),
+			post.Title(ast.OpLike, "%example%"),
+		),
+		post.Or(
+			post.UserID(ast.OpEqual, "6780"),
+			post.UserID(ast.OpEqual, "67890"),
+		),
+	)
+	printExample("Multiple OR conditions", sql13, params13)
+
+	// Example: Complex boolean expression (a AND b) OR (c AND d)
+	sql14, params14 := query.Select[tables.User](
+		user.Or(
+			user.And(
+				user.Name(ast.OpEqual, "John"),
+				user.Email(ast.OpLike, "%@example.com"),
+			),
+			user.And(
+				user.Name(ast.OpEqual, "Jane"),
+				user.Email(ast.OpLike, "%@company.com"),
+			),
+		),
+	)
+	printExample("Complex boolean expression: (a AND b) OR (c AND d)", sql14, params14)
 }

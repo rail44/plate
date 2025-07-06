@@ -58,22 +58,12 @@ const (
 
 // Or creates an OR condition that can be used at the top level
 func Or(opts ...types.ExprOption[tables.User]) types.ExprOption[tables.User] {
-	return func(s *types.State, expr *ast.Expr) {
-		if len(opts) == 0 {
-			return
-		}
+	return query.Or(opts...)
+}
 
-		var left ast.Expr
-		opts[0](s, &left)
-
-		for i := 1; i < len(opts); i++ {
-			var right ast.Expr
-			opts[i](s, &right)
-			left = query.OrExpr(left, right)
-		}
-
-		*expr = left
-	}
+// And creates an AND condition that groups multiple conditions
+func And(opts ...types.ExprOption[tables.User]) types.ExprOption[tables.User] {
+	return query.And(opts...)
 }
 
 func Paren(inner types.ExprOption[tables.User]) types.ExprOption[tables.User] {

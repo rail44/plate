@@ -36,28 +36,6 @@ func WhereClause(expr ast.Expr) *ast.Where {
 	}
 }
 
-// AndExpr creates an AND expression with parentheses
-func AndExpr(left, right ast.Expr) ast.Expr {
-	return &ast.ParenExpr{
-		Expr: &ast.BinaryExpr{
-			Op:    ast.OpAnd,
-			Left:  left,
-			Right: right,
-		},
-	}
-}
-
-// OrExpr creates an OR expression with parentheses
-func OrExpr(left, right ast.Expr) ast.Expr {
-	return &ast.ParenExpr{
-		Expr: &ast.BinaryExpr{
-			Op:    ast.OpOr,
-			Left:  left,
-			Right: right,
-		},
-	}
-}
-
 // ParenExpr wraps an expression in parentheses
 func ParenExpr(inner ast.Expr) ast.Expr {
 	return &ast.ParenExpr{
@@ -78,6 +56,58 @@ func ColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName string) as
 		Right: &ast.Param{
 			Name: paramName,
 		},
+	}
+}
+
+// And creates an AND condition that groups multiple conditions
+func And[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
+	return func(s *types.State, expr *ast.Expr) {
+		if len(opts) == 0 {
+			return
+		}
+
+		var left ast.Expr
+		opts[0](s, &left)
+
+		for i := 1; i < len(opts); i++ {
+			var right ast.Expr
+			opts[i](s, &right)
+			left = &ast.ParenExpr{
+				Expr: &ast.BinaryExpr{
+					Op:    ast.OpAnd,
+					Left:  left,
+					Right: right,
+				},
+			}
+		}
+
+		*expr = left
+	}
+}
+
+// Or creates an OR condition from multiple conditions
+func Or[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
+	return func(s *types.State, expr *ast.Expr) {
+		if len(opts) == 0 {
+			return
+		}
+
+		var left ast.Expr
+		opts[0](s, &left)
+
+		for i := 1; i < len(opts); i++ {
+			var right ast.Expr
+			opts[i](s, &right)
+			left = &ast.ParenExpr{
+				Expr: &ast.BinaryExpr{
+					Op:    ast.OpOr,
+					Left:  left,
+					Right: right,
+				},
+			}
+		}
+
+		*expr = left
 	}
 }
 

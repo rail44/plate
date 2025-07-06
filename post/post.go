@@ -73,23 +73,14 @@ func Limit(count int) types.QueryOption[tables.Post] {
 	}
 }
 
+// And creates an AND condition that groups multiple conditions
+func And(opts ...types.ExprOption[tables.Post]) types.ExprOption[tables.Post] {
+	return query.And(opts...)
+}
+
+// Or creates an OR condition from multiple conditions
 func Or(opts ...types.ExprOption[tables.Post]) types.ExprOption[tables.Post] {
-	return func(s *types.State, expr *ast.Expr) {
-		if len(opts) == 0 {
-			return
-		}
-
-		var left ast.Expr
-		opts[0](s, &left)
-
-		for i := 1; i < len(opts); i++ {
-			var right ast.Expr
-			opts[i](s, &right)
-			left = query.OrExpr(left, right)
-		}
-
-		*expr = left
-	}
+	return query.Or(opts...)
 }
 
 func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {

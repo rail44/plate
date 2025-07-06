@@ -39,23 +39,14 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Tag] {
 	}
 }
 
+// And creates an AND condition that groups multiple conditions
+func And(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
+	return query.And(opts...)
+}
+
+// Or creates an OR condition from multiple conditions
 func Or(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
-	return func(s *types.State, expr *ast.Expr) {
-		if len(opts) == 0 {
-			return
-		}
-
-		var left ast.Expr
-		opts[0](s, &left)
-
-		for i := 1; i < len(opts); i++ {
-			var right ast.Expr
-			opts[i](s, &right)
-			left = query.OrExpr(left, right)
-		}
-
-		*expr = left
-	}
+	return query.Or(opts...)
 }
 
 // Posts joins with post table through post_tag junction table (many-to-many relationship)
