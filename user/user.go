@@ -20,7 +20,6 @@ func Email() types.Column[tables.User, string] {
 	return types.Column[tables.User, string]{Name: "email"}
 }
 
-
 func Limit(count int) types.QueryOption[tables.User] {
 	return query.Limit[tables.User](count)
 }
@@ -51,27 +50,11 @@ func WithInnerJoin() types.QueryOption[tables.User] {
 
 // Posts joins with post table (has_many relationship)
 func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-
-		baseAlias := s.CurrentAlias()
-
-		s.WithRelationship("posts", func(alias string) {
-			// Create and apply JOIN
-			sl.From.Source = query.Join(query.JoinConfig{
-				Source:      sl.From.Source,
-				BaseTable:   baseAlias,
-				TargetTable: "post",
-				TargetAlias: alias,
-				BaseKey:     "id",
-				TargetKey:   "user_id",
-				JoinType:    ast.LeftOuterJoin,
-			})
-
-			// Apply options
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-		})
-	}
+	return query.DirectJoin[tables.User, tables.Post](
+		"posts",
+		"post",
+		query.KeyPair{From: "id", To: "user_id"},
+		ast.LeftOuterJoin,
+		opts...,
+	)
 }

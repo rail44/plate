@@ -9,29 +9,13 @@ import (
 
 // Author joins with user table (belongs_to relationship)
 func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-
-		baseAlias := s.CurrentAlias()
-
-		s.WithRelationship("author", func(alias string) {
-			// Create and apply JOIN
-			sl.From.Source = query.Join(query.JoinConfig{
-				Source:      sl.From.Source,
-				BaseTable:   baseAlias,
-				TargetTable: "user",
-				TargetAlias: alias,
-				BaseKey:     "user_id",
-				TargetKey:   "id",
-				JoinType:    ast.InnerJoin,
-			})
-
-			// Apply options
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-		})
-	}
+	return query.DirectJoin[tables.Post, tables.User](
+		"author",
+		"user",
+		query.KeyPair{From: "user_id", To: "id"},
+		ast.InnerJoin,
+		opts...,
+	)
 }
 
 // Column accessors for type-safe column references
@@ -50,7 +34,6 @@ func Title() types.Column[tables.Post, string] {
 func Content() types.Column[tables.Post, string] {
 	return types.Column[tables.Post, string]{Name: "content"}
 }
-
 
 func Limit(count int) types.QueryOption[tables.Post] {
 	return query.Limit[tables.Post](count)
@@ -82,42 +65,13 @@ func WithInnerJoin() types.QueryOption[tables.Post] {
 
 // Tags joins with tag table through post_tag junction table (many-to-many relationship)
 func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-
-		baseAlias := s.CurrentAlias()
-		junctionAlias := s.RegisterJunction("post_tag")
-
-		s.WithRelationship("tags", func(targetAlias string) {
-			// Create and apply JOIN
-			sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
-				Source:        sl.From.Source,
-				BaseTable:     baseAlias,
-				JunctionTable: "post_tag",
-				JunctionAlias: junctionAlias,
-				TargetTable:   "tag",
-				TargetAlias:   targetAlias,
-				BaseToJunction: struct {
-					BaseKey     string
-					JunctionKey string
-				}{
-					BaseKey:     "id",
-					JunctionKey: "post_id",
-				},
-				JunctionToTarget: struct {
-					JunctionKey string
-					TargetKey   string
-				}{
-					JunctionKey: "tag_id",
-					TargetKey:   "id",
-				},
-				JoinType: ast.LeftOuterJoin,
-			})
-
-			// Apply options
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-		})
-	}
+	return query.JunctionJoin[tables.Post, tables.Tag](
+		"tags",
+		"post_tag",
+		query.KeyPair{From: "id", To: "post_id"},
+		"tag",
+		query.KeyPair{From: "tag_id", To: "id"},
+		ast.LeftOuterJoin,
+		opts...,
+	)
 }

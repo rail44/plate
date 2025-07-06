@@ -7,8 +7,6 @@ import (
 	"github.com/rail44/plate/types"
 )
 
-
-
 // And creates an AND condition that groups multiple conditions
 func And[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
 	return func(s *types.State, expr *ast.Expr) {
@@ -97,58 +95,61 @@ func Select[T types.Table](opts ...types.Option[T]) (string, []any) {
 	return q.SQL(), s.Params
 }
 
-// JoinConfig contains configuration for building JOIN clauses
-type JoinConfig struct {
+// KeyPair represents a relationship between two tables through their keys
+type KeyPair struct {
+	From string // Key from the source table
+	To   string // Key in the target table
+}
+
+// joinConfig contains configuration for building JOIN clauses
+type joinConfig struct {
 	Source      ast.TableExpr
 	BaseTable   string
 	TargetTable string
 	TargetAlias string
-	BaseKey     string
-	TargetKey   string
+	Keys        KeyPair
 	JoinType    ast.JoinOp // JOIN type (INNER, LEFT OUTER, etc.)
 }
 
-// JoinThroughConfig contains configuration for building many-to-many JOIN through a junction table
-type JoinThroughConfig struct {
-	Source         ast.TableExpr
-	BaseTable      string
-	JunctionTable  string
-	JunctionAlias  string
-	TargetTable    string
-	TargetAlias    string
-	BaseToJunction struct {
-		BaseKey     string
-		JunctionKey string
-	}
-	JunctionToTarget struct {
-		JunctionKey string
-		TargetKey   string
-	}
-	JoinType ast.JoinOp
+// joinThroughConfig contains configuration for building many-to-many JOIN through a junction table
+type joinThroughConfig struct {
+	Source           ast.TableExpr
+	BaseTable        string
+	JunctionTable    string
+	JunctionAlias    string
+	TargetTable      string
+	TargetAlias      string
+	BaseToJunction   KeyPair
+	JunctionToTarget KeyPair
+	JoinType         ast.JoinOp
 }
 
-// JoinThrough creates a many-to-many JOIN through a junction table
-func JoinThrough(config JoinThroughConfig) *ast.Join {
+// joinThrough creates a many-to-many JOIN through a junction table
+func joinThrough(config joinThroughConfig) *ast.Join {
 	// First create junction table join
-	junctionJoin := Join(JoinConfig{
+	junctionJoin := join(joinConfig{
 		Source:      config.Source,
 		BaseTable:   config.BaseTable,
 		TargetTable: config.JunctionTable,
 		TargetAlias: config.JunctionAlias,
-		BaseKey:     config.BaseToJunction.BaseKey,
-		TargetKey:   config.BaseToJunction.JunctionKey,
-		JoinType:    config.JoinType,
+		Keys: KeyPair{
+			From: config.BaseToJunction.From,
+			To:   config.BaseToJunction.To,
+		},
+		JoinType: config.JoinType,
 	})
 
 	// Then create target table join using junction join as source
-	return Join(JoinConfig{
+	return join(joinConfig{
 		Source:      junctionJoin,
 		BaseTable:   config.JunctionAlias,
 		TargetTable: config.TargetTable,
 		TargetAlias: config.TargetAlias,
-		BaseKey:     config.JunctionToTarget.JunctionKey,
-		TargetKey:   config.JunctionToTarget.TargetKey,
-		JoinType:    config.JoinType,
+		Keys: KeyPair{
+			From: config.JunctionToTarget.From,
+			To:   config.JunctionToTarget.To,
+		},
+		JoinType: config.JoinType,
 	})
 }
 
@@ -164,8 +165,8 @@ func FindLastJoin(source ast.TableExpr) *ast.Join {
 	return nil
 }
 
-// Join creates a JOIN AST node
-func Join(config JoinConfig) *ast.Join {
+// join creates a JOIN AST node
+func join(config joinConfig) *ast.Join {
 	return &ast.Join{
 		Left: config.Source,
 		Op:   config.JoinType,
@@ -184,14 +185,14 @@ func Join(config JoinConfig) *ast.Join {
 				Left: &ast.Path{
 					Idents: []*ast.Ident{
 						{Name: config.BaseTable},
-						{Name: config.BaseKey},
+						{Name: config.Keys.From},
 					},
 				},
 				Op: ast.OpEqual,
 				Right: &ast.Path{
 					Idents: []*ast.Ident{
 						{Name: config.TargetAlias},
-						{Name: config.TargetKey},
+						{Name: config.Keys.To},
 					},
 				},
 			},
@@ -225,7 +226,7 @@ func Not[T types.Table](opt types.ExprOption[T]) types.ExprOption[T] {
 	return func(s *types.State, expr *ast.Expr) {
 		// Build the inner expression first
 		opt(s, expr)
-		
+
 		// Wrap with NOT
 		*expr = &ast.UnaryExpr{
 			Op:   ast.OpNot,
@@ -254,5 +255,73 @@ func WithInnerJoinOption[T types.Table]() types.QueryOption[T] {
 				join.Op = ast.InnerJoin
 			}
 		}
+	}
+}
+
+// DirectJoin creates a direct JOIN relationship (one-to-many or belongs-to)
+func DirectJoin[TBase types.Table, TTarget types.Table](
+	relationshipName string,
+	targetTable string,
+	keys KeyPair,
+	joinType ast.JoinOp,
+	opts ...types.Option[TTarget],
+) types.QueryOption[TBase] {
+	return func(s *types.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
+		baseAlias := s.CurrentAlias()
+
+		s.WithRelationship(relationshipName, func(alias string) {
+			// Create and apply JOIN
+			sl.From.Source = join(joinConfig{
+				Source:      sl.From.Source,
+				BaseTable:   baseAlias,
+				TargetTable: targetTable,
+				TargetAlias: alias,
+				Keys:        keys,
+				JoinType:    joinType,
+			})
+
+			// Apply options
+			for _, opt := range opts {
+				opt.Apply(s, q)
+			}
+		})
+	}
+}
+
+// JunctionJoin creates a many-to-many JOIN through a junction table
+func JunctionJoin[TBase types.Table, TTarget types.Table](
+	relationshipName string,
+	junctionTable string,
+	baseToJunction KeyPair,
+	targetTable string,
+	junctionToTarget KeyPair,
+	joinType ast.JoinOp,
+	opts ...types.Option[TTarget],
+) types.QueryOption[TBase] {
+	return func(s *types.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
+		baseAlias := s.CurrentAlias()
+		junctionAlias := s.RegisterJunction(junctionTable)
+
+		s.WithRelationship(relationshipName, func(targetAlias string) {
+			// Create and apply JOIN
+			sl.From.Source = joinThrough(joinThroughConfig{
+				Source:           sl.From.Source,
+				BaseTable:        baseAlias,
+				JunctionTable:    junctionTable,
+				JunctionAlias:    junctionAlias,
+				TargetTable:      targetTable,
+				TargetAlias:      targetAlias,
+				BaseToJunction:   baseToJunction,
+				JunctionToTarget: junctionToTarget,
+				JoinType:         joinType,
+			})
+
+			// Apply options
+			for _, opt := range opts {
+				opt.Apply(s, q)
+			}
+		})
 	}
 }

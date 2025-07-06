@@ -46,42 +46,13 @@ func Not(opt types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 
 // Posts joins with post table through post_tag junction table (many-to-many relationship)
 func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-
-		baseAlias := s.CurrentAlias()
-		junctionAlias := s.RegisterJunction("post_tag")
-
-		s.WithRelationship("posts", func(targetAlias string) {
-			// Create and apply JOIN
-			sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
-				Source:        sl.From.Source,
-				BaseTable:     baseAlias,
-				JunctionTable: "post_tag",
-				JunctionAlias: junctionAlias,
-				TargetTable:   "post",
-				TargetAlias:   targetAlias,
-				BaseToJunction: struct {
-					BaseKey     string
-					JunctionKey string
-				}{
-					BaseKey:     "id",
-					JunctionKey: "tag_id",
-				},
-				JunctionToTarget: struct {
-					JunctionKey string
-					TargetKey   string
-				}{
-					JunctionKey: "post_id",
-					TargetKey:   "id",
-				},
-				JoinType: ast.LeftOuterJoin,
-			})
-
-			// Apply options
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-		})
-	}
+	return query.JunctionJoin[tables.Tag, tables.Post](
+		"posts",
+		"post_tag",
+		query.KeyPair{From: "id", To: "tag_id"},
+		"post",
+		query.KeyPair{From: "post_id", To: "id"},
+		ast.LeftOuterJoin,
+		opts...,
+	)
 }

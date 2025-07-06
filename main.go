@@ -94,7 +94,7 @@ func main() {
 	sql7, params7 := query.Select[tables.Post](
 		post.Tags(tag.Name().Eq("Go")),
 		post.Title().Like("%tutorial%"),
-			// TODO: OrderBy temporarily disabled until CreatedAt column is added
+		// TODO: OrderBy temporarily disabled until CreatedAt column is added
 	)
 	printExample("Posts with specific tag (through junction table)", sql7, params7)
 
@@ -115,7 +115,7 @@ func main() {
 	sql9, params9 := query.Select[tables.Tag](
 		tag.Posts(post.Title().Like("%announcement%")),
 		tag.Name().Like("tech%"),
-			tag.OrderBy(tag.Name(), ast.DirectionAsc),
+		tag.OrderBy(tag.Name(), ast.DirectionAsc),
 	)
 	printExample("Tags used in specific posts", sql9, params9)
 
@@ -155,7 +155,7 @@ func main() {
 			),
 			post.Title().Like("%announcement%"),
 		),
-			tag.OrderBy(tag.Name(), ast.DirectionAsc),
+		tag.OrderBy(tag.Name(), ast.DirectionAsc),
 	)
 	printExample("Tag → Posts → User (reverse navigation)", sql12, params12)
 

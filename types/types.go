@@ -2,8 +2,8 @@ package types
 
 import (
 	"fmt"
-	"strings"
 	"github.com/cloudspannerecosystem/memefish/ast"
+	"strings"
 )
 
 type State struct {
@@ -16,10 +16,10 @@ type State struct {
 func (s *State) registerRelationship(relationshipName string) string {
 	// Add to path
 	s.RelationshipPath = append(s.RelationshipPath, relationshipName)
-	
+
 	// Get alias using CurrentAlias
 	alias := s.CurrentAlias()
-	
+
 	s.Tables[alias] = struct{}{}
 	return alias
 }
@@ -34,7 +34,7 @@ func (s *State) RegisterJunction(tableName string) string {
 	} else {
 		alias = tableName
 	}
-	
+
 	s.Tables[alias] = struct{}{}
 	return alias
 }
@@ -58,13 +58,13 @@ func (s *State) WithRelationship(relationshipName string, fn func(alias string))
 	// Save current path
 	basePath := make([]string, len(s.RelationshipPath))
 	copy(basePath, s.RelationshipPath)
-	
+
 	// Register relationship
 	alias := s.registerRelationship(relationshipName)
-	
+
 	// Execute function in scope
 	fn(alias)
-	
+
 	// Restore path
 	s.RelationshipPath = basePath
 }
@@ -87,10 +87,10 @@ func (opt ExprOption[T]) Apply(s *State, q *ast.Query) {
 	if sl.Where == nil {
 		sl.Where = &ast.Where{}
 	}
-	
+
 	var expr ast.Expr
 	opt(s, &expr)
-	
+
 	if sl.Where.Expr == nil {
 		sl.Where.Expr = expr
 	} else {
@@ -185,7 +185,7 @@ func (c Column[T, V]) Between(min, max V) ExprOption[T] {
 		s.Params = append(s.Params, min)
 		maxIdx := len(s.Params)
 		s.Params = append(s.Params, max)
-		
+
 		*expr = &ast.BetweenExpr{
 			Not: false,
 			Left: &ast.Path{
@@ -195,7 +195,7 @@ func (c Column[T, V]) Between(min, max V) ExprOption[T] {
 				},
 			},
 			RightStart: &ast.Param{Name: fmt.Sprintf("p%d", minIdx)},
-			RightEnd: &ast.Param{Name: fmt.Sprintf("p%d", maxIdx)},
+			RightEnd:   &ast.Param{Name: fmt.Sprintf("p%d", maxIdx)},
 		}
 	}
 }
@@ -209,7 +209,7 @@ func (c Column[T, V]) In(values ...V) ExprOption[T] {
 			s.Params = append(s.Params, value)
 			exprs = append(exprs, &ast.Param{Name: fmt.Sprintf("p%d", i)})
 		}
-		
+
 		*expr = &ast.InExpr{
 			Not: false,
 			Left: &ast.Path{
@@ -254,4 +254,3 @@ func (c Column[T, V]) IsNotNull() ExprOption[T] {
 		}
 	}
 }
-
