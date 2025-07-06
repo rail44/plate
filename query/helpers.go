@@ -29,20 +29,6 @@ func OrderByItem(tableAlias, column string, dir ast.Direction) *ast.OrderByItem 
 	}
 }
 
-// WhereClause creates a Where AST node
-func WhereClause(expr ast.Expr) *ast.Where {
-	return &ast.Where{
-		Expr: expr,
-	}
-}
-
-// ParenExpr wraps an expression in parentheses
-func ParenExpr(inner ast.Expr) ast.Expr {
-	return &ast.ParenExpr{
-		Expr: inner,
-	}
-}
-
 // ColumnExpr creates a column reference expression with parameter
 func ColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName string) ast.Expr {
 	return &ast.BinaryExpr{

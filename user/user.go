@@ -66,14 +66,6 @@ func And(opts ...types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 	return query.And(opts...)
 }
 
-func Paren(inner types.ExprOption[tables.User]) types.ExprOption[tables.User] {
-	return func(s *types.State, expr *ast.Expr) {
-		var innerExpr ast.Expr
-		inner(s, &innerExpr)
-		*expr = query.ParenExpr(innerExpr)
-	}
-}
-
 // Posts joins with post table (has_many relationship)
 func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
