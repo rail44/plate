@@ -204,4 +204,37 @@ func main() {
 		user.OrderBy(user.Email(), ast.DirectionDesc),
 	)
 	printExample("New Column API demonstration", sql16, params16)
+
+	printSection("Type-Safe Column API Examples")
+
+	// Example: Using Between for range queries (compile-time type safe)
+	sql17, params17 := query.Select[tables.User](
+		user.ID().Between("100", "200"),
+		user.OrderBy(user.ID(), ast.DirectionAsc),
+	)
+	printExample("BETWEEN with type safety", sql17, params17)
+
+	// Example: Using IN for multiple values
+	sql18, params18 := query.Select[tables.User](
+		user.Name().In("John", "Jane", "Bob"),
+		user.Email().IsNotNull(),
+		user.OrderBy(user.Name(), ast.DirectionAsc),
+	)
+	printExample("IN condition with type safety", sql18, params18)
+
+	// Example: NULL checking
+	sql19, params19 := query.Select[tables.Post](
+		post.Content().IsNotNull(),
+		post.Title().Like("%important%"),
+		post.OrderBy(post.Title(), ast.DirectionDesc),
+	)
+	printExample("NULL checking with type safety", sql19, params19)
+
+	// Example: String-specific methods (Like only works with string columns)
+	sql20, params20 := query.Select[tables.Post](
+		post.Title().Like("Tutorial:%"),
+		post.Content().NotLike("%deprecated%"),
+		post.OrderBy(post.Title(), ast.DirectionAsc),
+	)
+	printExample("String-specific methods (Like/NotLike)", sql20, params20)
 }

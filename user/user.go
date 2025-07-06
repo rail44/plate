@@ -8,16 +8,16 @@ import (
 )
 
 // Column accessors for type-safe column references
-func ID() types.Column[tables.User] {
-	return types.Column[tables.User]{Name: "id"}
+func ID() types.Column[tables.User, string] {
+	return types.Column[tables.User, string]{Name: "id"}
 }
 
-func Name() types.Column[tables.User] {
-	return types.Column[tables.User]{Name: "name"}
+func Name() types.Column[tables.User, string] {
+	return types.Column[tables.User, string]{Name: "name"}
 }
 
-func Email() types.Column[tables.User] {
-	return types.Column[tables.User]{Name: "email"}
+func Email() types.Column[tables.User, string] {
+	return types.Column[tables.User, string]{Name: "email"}
 }
 
 
@@ -27,7 +27,7 @@ func Limit(count int) types.QueryOption[tables.User] {
 	}
 }
 
-func OrderBy(column types.Column[tables.User], dir ast.Direction) types.QueryOption[tables.User] {
+func OrderBy[V any](column types.Column[tables.User, V], dir ast.Direction) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{

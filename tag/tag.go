@@ -8,12 +8,12 @@ import (
 )
 
 // Column accessors for type-safe column references
-func ID() types.Column[tables.Tag] {
-	return types.Column[tables.Tag]{Name: "id"}
+func ID() types.Column[tables.Tag, string] {
+	return types.Column[tables.Tag, string]{Name: "id"}
 }
 
-func Name() types.Column[tables.Tag] {
-	return types.Column[tables.Tag]{Name: "name"}
+func Name() types.Column[tables.Tag, string] {
+	return types.Column[tables.Tag, string]{Name: "name"}
 }
 
 func Limit(count int) types.QueryOption[tables.Tag] {
@@ -22,7 +22,7 @@ func Limit(count int) types.QueryOption[tables.Tag] {
 	}
 }
 
-func OrderBy(column types.Column[tables.Tag], dir ast.Direction) types.QueryOption[tables.Tag] {
+func OrderBy[V any](column types.Column[tables.Tag, V], dir ast.Direction) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{}

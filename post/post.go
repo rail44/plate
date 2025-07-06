@@ -35,20 +35,20 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 }
 
 // Column accessors for type-safe column references
-func ID() types.Column[tables.Post] {
-	return types.Column[tables.Post]{Name: "id"}
+func ID() types.Column[tables.Post, string] {
+	return types.Column[tables.Post, string]{Name: "id"}
 }
 
-func UserID() types.Column[tables.Post] {
-	return types.Column[tables.Post]{Name: "user_id"}
+func UserID() types.Column[tables.Post, string] {
+	return types.Column[tables.Post, string]{Name: "user_id"}
 }
 
-func Title() types.Column[tables.Post] {
-	return types.Column[tables.Post]{Name: "title"}
+func Title() types.Column[tables.Post, string] {
+	return types.Column[tables.Post, string]{Name: "title"}
 }
 
-func Content() types.Column[tables.Post] {
-	return types.Column[tables.Post]{Name: "content"}
+func Content() types.Column[tables.Post, string] {
+	return types.Column[tables.Post, string]{Name: "content"}
 }
 
 
@@ -68,7 +68,7 @@ func Or(opts ...types.ExprOption[tables.Post]) types.ExprOption[tables.Post] {
 	return query.Or(opts...)
 }
 
-func OrderBy(column types.Column[tables.Post], dir ast.Direction) types.QueryOption[tables.Post] {
+func OrderBy[V any](column types.Column[tables.Post, V], dir ast.Direction) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{}
