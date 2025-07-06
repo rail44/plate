@@ -9,7 +9,7 @@ import (
 )
 
 func JoinProfile(whereOpt types.ExprOption[tables.Profile]) types.QueryOption[tables.User] {
-	return types.QueryOption[tables.User](query.BuildJoin(query.JoinConfig{
+	return types.QueryOption[tables.User](query.Join(query.JoinConfig{
 		BaseTable:   "user",
 		TargetTable: "profile",
 		BaseKey:     "id",
@@ -23,7 +23,7 @@ func JoinProfile(whereOpt types.ExprOption[tables.Profile]) types.QueryOption[ta
 }
 
 func LeftJoinProfile(whereOpt types.ExprOption[tables.Profile]) types.QueryOption[tables.User] {
-	return types.QueryOption[tables.User](query.BuildJoin(query.JoinConfig{
+	return types.QueryOption[tables.User](query.Join(query.JoinConfig{
 		BaseTable:   "user",
 		TargetTable: "profile",
 		BaseKey:     "id",
@@ -40,7 +40,7 @@ func ID(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "id", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.WorkingTableAlias, "id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -48,7 +48,7 @@ func Name(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "name", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.WorkingTableAlias, "name", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -56,7 +56,7 @@ func Email(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "email", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.WorkingTableAlias, "email", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -72,7 +72,7 @@ func Where(opt types.ExprOption[tables.User]) types.QueryOption[tables.User] {
 
 func Limit(count int) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
-		q.Limit = query.BuildLimit(count)
+		q.Limit = query.Limit(count)
 	}
 }
 
@@ -84,7 +84,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.User] {
 			}
 		}
 		q.OrderBy.Items = append(q.OrderBy.Items,
-			query.BuildOrderByItem(s.WorkingTableAlias, column, dir))
+			query.OrderByItem(s.WorkingTableAlias, column, dir))
 	}
 }
 
@@ -136,13 +136,13 @@ func Paren(inner types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		var innerExpr ast.Expr
 		inner(s, &innerExpr)
-		*expr = query.BuildParenExpr(innerExpr)
+		*expr = query.ParenExpr(innerExpr)
 	}
 }
 
 // Posts joins with post table (has_many relationship)
 func Posts(whereOpt types.ExprOption[tables.Post]) types.QueryOption[tables.User] {
-	return types.QueryOption[tables.User](query.BuildJoin(query.JoinConfig{
+	return types.QueryOption[tables.User](query.Join(query.JoinConfig{
 		BaseTable:   "user",
 		TargetTable: "post",
 		BaseKey:     "id",

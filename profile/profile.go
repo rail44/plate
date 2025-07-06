@@ -9,7 +9,7 @@ import (
 )
 
 func JoinUser(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.Profile] {
-	return types.QueryOption[tables.Profile](query.BuildJoin(query.JoinConfig{
+	return types.QueryOption[tables.Profile](query.Join(query.JoinConfig{
 		BaseTable:   "profile",
 		TargetTable: "user",
 		BaseKey:     "user_id",
@@ -23,7 +23,7 @@ func JoinUser(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.P
 }
 
 func LeftJoinUser(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.Profile] {
-	return types.QueryOption[tables.Profile](query.BuildJoin(query.JoinConfig{
+	return types.QueryOption[tables.Profile](query.Join(query.JoinConfig{
 		BaseTable:   "profile",
 		TargetTable: "user",
 		BaseKey:     "user_id",
@@ -40,7 +40,7 @@ func UserID(op ast.BinaryOp, value string) types.ExprOption[tables.Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "user_id", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.WorkingTableAlias, "user_id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -48,7 +48,7 @@ func Bio(op ast.BinaryOp, value string) types.ExprOption[tables.Profile] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "bio", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.WorkingTableAlias, "bio", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -104,13 +104,13 @@ func Paren(inner types.ExprOption[tables.Profile]) types.ExprOption[tables.Profi
 	return func(s *types.State, expr *ast.Expr) {
 		var innerExpr ast.Expr
 		inner(s, &innerExpr)
-		*expr = query.BuildParenExpr(innerExpr)
+		*expr = query.ParenExpr(innerExpr)
 	}
 }
 
 func Limit(count int) types.QueryOption[tables.Profile] {
 	return func(s *types.State, q *ast.Query) {
-		q.Limit = query.BuildLimit(count)
+		q.Limit = query.Limit(count)
 	}
 }
 
@@ -122,7 +122,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Profile]
 			}
 		}
 		q.OrderBy.Items = append(q.OrderBy.Items,
-			query.BuildOrderByItem(s.WorkingTableAlias, column, dir))
+			query.OrderByItem(s.WorkingTableAlias, column, dir))
 	}
 }
 

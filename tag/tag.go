@@ -12,7 +12,7 @@ func ID(op ast.BinaryOp, value string) types.ExprOption[tables.Tag] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "id", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.WorkingTableAlias, "id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -20,7 +20,7 @@ func Name(op ast.BinaryOp, value string) types.ExprOption[tables.Tag] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.BuildColumnExpr(s.WorkingTableAlias, "name", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.WorkingTableAlias, "name", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -36,7 +36,7 @@ func Where(opt types.ExprOption[tables.Tag]) types.QueryOption[tables.Tag] {
 
 func Limit(count int) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
-		q.Limit = query.BuildLimit(count)
+		q.Limit = query.Limit(count)
 	}
 }
 
@@ -45,7 +45,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Tag] {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{}
 		}
-		q.OrderBy.Items = append(q.OrderBy.Items, query.BuildOrderByItem("tag", column, dir))
+		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem("tag", column, dir))
 	}
 }
 
@@ -65,16 +65,16 @@ func Or(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 		for i := 1; i < len(opts); i++ {
 			var right ast.Expr
 			opts[i](s, &right)
-			left = query.BuildOrExpr(left, right)
+			left = query.OrExpr(left, right)
 		}
 
-		*expr = query.BuildParenExpr(left)
+		*expr = query.ParenExpr(left)
 	}
 }
 
 // Posts joins with post table through post_tag junction table (many-to-many relationship)
 func Posts(whereOpt types.ExprOption[tables.Post]) types.QueryOption[tables.Tag] {
-	return types.QueryOption[tables.Tag](query.BuildJoinThrough(query.JoinThroughConfig{
+	return types.QueryOption[tables.Tag](query.JoinThrough(query.JoinThroughConfig{
 		BaseTable:     "tag",
 		JunctionTable: "post_tag",
 		TargetTable:   "post",

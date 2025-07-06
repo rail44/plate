@@ -7,8 +7,8 @@ import (
 	"github.com/rail44/plate/types"
 )
 
-// BuildLimit creates a Limit AST node
-func BuildLimit(count int) *ast.Limit {
+// Limit creates a Limit AST node
+func Limit(count int) *ast.Limit {
 	return &ast.Limit{
 		Count: &ast.IntLiteral{
 			Value: fmt.Sprintf("%d", count),
@@ -16,8 +16,8 @@ func BuildLimit(count int) *ast.Limit {
 	}
 }
 
-// BuildOrderByItem creates an OrderByItem AST node
-func BuildOrderByItem(tableAlias, column string, dir ast.Direction) *ast.OrderByItem {
+// OrderByItem creates an OrderByItem AST node
+func OrderByItem(tableAlias, column string, dir ast.Direction) *ast.OrderByItem {
 	return &ast.OrderByItem{
 		Expr: &ast.Path{
 			Idents: []*ast.Ident{
@@ -29,15 +29,15 @@ func BuildOrderByItem(tableAlias, column string, dir ast.Direction) *ast.OrderBy
 	}
 }
 
-// BuildWhereClause creates a Where AST node
-func BuildWhereClause(expr ast.Expr) *ast.Where {
+// WhereClause creates a Where AST node
+func WhereClause(expr ast.Expr) *ast.Where {
 	return &ast.Where{
 		Expr: expr,
 	}
 }
 
-// BuildAndExpr creates an AND expression with parentheses
-func BuildAndExpr(left, right ast.Expr) ast.Expr {
+// AndExpr creates an AND expression with parentheses
+func AndExpr(left, right ast.Expr) ast.Expr {
 	return &ast.ParenExpr{
 		Expr: &ast.BinaryExpr{
 			Op:    ast.OpAnd,
@@ -47,8 +47,8 @@ func BuildAndExpr(left, right ast.Expr) ast.Expr {
 	}
 }
 
-// BuildOrExpr creates an OR expression with parentheses
-func BuildOrExpr(left, right ast.Expr) ast.Expr {
+// OrExpr creates an OR expression with parentheses
+func OrExpr(left, right ast.Expr) ast.Expr {
 	return &ast.ParenExpr{
 		Expr: &ast.BinaryExpr{
 			Op:    ast.OpOr,
@@ -58,15 +58,15 @@ func BuildOrExpr(left, right ast.Expr) ast.Expr {
 	}
 }
 
-// BuildParenExpr wraps an expression in parentheses
-func BuildParenExpr(inner ast.Expr) ast.Expr {
+// ParenExpr wraps an expression in parentheses
+func ParenExpr(inner ast.Expr) ast.Expr {
 	return &ast.ParenExpr{
 		Expr: inner,
 	}
 }
 
-// BuildColumnExpr creates a column reference expression with parameter
-func BuildColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName string) ast.Expr {
+// ColumnExpr creates a column reference expression with parameter
+func ColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName string) ast.Expr {
 	return &ast.BinaryExpr{
 		Left: &ast.Path{
 			Idents: []*ast.Ident{
@@ -104,8 +104,8 @@ func ConvertToQueryOption[T types.Table](opt types.ExprOption[T]) types.QueryOpt
 	}
 }
 
-// BuildSelect creates a SELECT query with the given options
-func BuildSelect[T types.Table](opts []types.QueryOption[T]) (string, []any) {
+// selectQuery creates a SELECT query with the given options (internal function)
+func selectQuery[T types.Table](opts []types.QueryOption[T]) (string, []any) {
 	var t T
 	tableName := t.TableName()
 	
@@ -180,7 +180,7 @@ func Select[T types.Table](args ...interface{}) (string, []any) {
 		}
 	}
 	
-	return BuildSelect(opts)
+	return selectQuery(opts)
 }
 
 
@@ -209,11 +209,11 @@ type JoinThroughConfig struct {
 	JoinType ast.JoinOp
 }
 
-// BuildJoinThrough creates a many-to-many JOIN operation through a junction table
-func BuildJoinThrough(config JoinThroughConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
+// JoinThrough creates a many-to-many JOIN operation through a junction table
+func JoinThrough(config JoinThroughConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
 	return func(s *types.State, q *ast.Query) {
 		// First apply junction table join
-		junctionJoin := BuildJoin(JoinConfig{
+		junctionJoin := Join(JoinConfig{
 			BaseTable:   config.BaseTable,
 			TargetTable: config.JunctionTable,
 			BaseKey:     config.BaseToJunction.BaseKey,
@@ -223,7 +223,7 @@ func BuildJoinThrough(config JoinThroughConfig, whereOpt func(*types.State, *ast
 		junctionJoin(s, q)
 
 		// Then apply target table join
-		targetJoin := BuildJoin(JoinConfig{
+		targetJoin := Join(JoinConfig{
 			BaseTable:   config.JunctionTable,
 			TargetTable: config.TargetTable,
 			BaseKey:     config.JunctionToTarget.JunctionKey,
@@ -234,8 +234,8 @@ func BuildJoinThrough(config JoinThroughConfig, whereOpt func(*types.State, *ast
 	}
 }
 
-// BuildJoin creates a JOIN operation with the given configuration
-func BuildJoin(config JoinConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
+// Join creates a JOIN operation with the given configuration
+func Join(config JoinConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
