@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
 	"github.com/rail44/plate/query"
 	"github.com/rail44/plate/tables"
@@ -19,15 +18,6 @@ func Name() types.Column[tables.User] {
 
 func Email() types.Column[tables.User] {
 	return types.Column[tables.User]{Name: "email"}
-}
-
-// Legacy functions for backward compatibility
-func IDLegacy(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "id", op, fmt.Sprintf("p%d", i))
-	}
 }
 
 

@@ -71,7 +71,7 @@ func main() {
 	// Example: Find non-admin users who have important posts
 	// Use case: Content moderation, important content tracking
 	sql5, params5 := query.Select[tables.User](
-		user.Posts(post.Content(ast.OpLike, "%important%")),
+		user.Posts(post.Content().Like("%important%")),
 		user.Name().Ne("Admin"),
 		user.OrderBy(user.Name(), ast.DirectionAsc),
 	)
@@ -81,8 +81,8 @@ func main() {
 	// Use case: Company news feed, official announcements
 	sql6, params6 := query.Select[tables.Post](
 		post.Author(user.Email().Like("%@company.com")),
-		post.Title(ast.OpLike, "Announcement:%"),
-		post.OrderBy("created_at", ast.DirectionDesc),
+		post.Title().Like("Announcement:%"),
+		post.OrderBy(post.Title(), ast.DirectionDesc),
 		post.Limit(10),
 	)
 	printExample("Posts with author filter (INNER JOIN)", sql6, params6)
@@ -92,9 +92,9 @@ func main() {
 	// Example: Find Go tutorials
 	// Use case: Tag-based content filtering, topic search
 	sql7, params7 := query.Select[tables.Post](
-		post.Tags(tag.Name(ast.OpEqual, "Go")),
-		post.Title(ast.OpLike, "%tutorial%"),
-		post.OrderBy("created_at", ast.DirectionDesc),
+		post.Tags(tag.Name().Eq("Go")),
+		post.Title().Like("%tutorial%"),
+			// TODO: OrderBy temporarily disabled until CreatedAt column is added
 	)
 	printExample("Posts with specific tag (through junction table)", sql7, params7)
 
@@ -102,8 +102,8 @@ func main() {
 	// Use case: Community content, excluding official posts
 	sql8, params8 := query.Select[tables.Post](
 		post.Tags(tag.Or(
-			tag.Name(ast.OpEqual, "Go"),
-			tag.Name(ast.OpEqual, "Tutorial"),
+			tag.Name().Eq("Go"),
+			tag.Name().Eq("Tutorial"),
 		)),
 		post.Author(user.Name().Ne("Admin")),
 		post.Limit(20),
@@ -113,9 +113,9 @@ func main() {
 	// Example: Find tech tags used in announcements
 	// Use case: Tag analytics, content categorization
 	sql9, params9 := query.Select[tables.Tag](
-		tag.Posts(post.Title(ast.OpLike, "%announcement%")),
-		tag.Name(ast.OpLike, "tech%"),
-		tag.OrderBy("name", ast.DirectionAsc),
+		tag.Posts(post.Title().Like("%announcement%")),
+		tag.Name().Like("tech%"),
+			tag.OrderBy(tag.Name(), ast.DirectionAsc),
 	)
 	printExample("Tags used in specific posts", sql9, params9)
 
@@ -127,7 +127,7 @@ func main() {
 		user.Email().Eq("john@example.com"),
 		user.Posts(
 			post.Tags(),
-			post.OrderBy("created_at", ast.DirectionDesc),
+			post.OrderBy(post.Title(), ast.DirectionDesc),
 		),
 	)
 	printExample("User → Posts → Tags (3-level JOIN)", sql10, params10)
@@ -137,9 +137,9 @@ func main() {
 	sql11, params11 := query.Select[tables.User](
 		user.Posts(
 			post.Tags(
-				tag.Name(ast.OpEqual, "Go"),
+				tag.Name().Eq("Go"),
 			),
-			post.Title(ast.OpLike, "%tutorial%"),
+			post.Title().Like("%tutorial%"),
 		),
 		user.OrderBy(user.Name(), ast.DirectionAsc),
 	)
@@ -148,25 +148,25 @@ func main() {
 	// Example: Analyze tag usage in company communications
 	// Use case: Content strategy, tag effectiveness analysis
 	sql12, params12 := query.Select[tables.Tag](
-		tag.Name(ast.OpLike, "tech%"),
+		tag.Name().Like("tech%"),
 		tag.Posts(
 			post.Author(
 				user.Email().Like("%@company.com"),
 			),
-			post.Title(ast.OpLike, "%announcement%"),
+			post.Title().Like("%announcement%"),
 		),
-		tag.OrderBy("name", ast.DirectionAsc),
+			tag.OrderBy(tag.Name(), ast.DirectionAsc),
 	)
 	printExample("Tag → Posts → User (reverse navigation)", sql12, params12)
 
 	sql13, params13 := query.Select[tables.Post](
 		post.Or(
-			post.ID(ast.OpEqual, "12345"),
-			post.Title(ast.OpLike, "%example%"),
+			post.ID().Eq("12345"),
+			post.Title().Like("%example%"),
 		),
 		post.Or(
-			post.UserID(ast.OpEqual, "6780"),
-			post.UserID(ast.OpEqual, "67890"),
+			post.UserID().Eq("6780"),
+			post.UserID().Eq("67890"),
 		),
 	)
 	printExample("Multiple OR conditions", sql13, params13)
@@ -189,7 +189,7 @@ func main() {
 	// Example: Using WithInnerJoin to get only users with posts
 	sql15, params15 := query.Select[tables.User](
 		user.Posts(
-			post.Title(ast.OpLike, "%important%"),
+			post.Title().Like("%important%"),
 			post.WithInnerJoin(),
 		),
 		user.OrderBy(user.Name(), ast.DirectionAsc),

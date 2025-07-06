@@ -1,27 +1,19 @@
 package tag
 
 import (
-	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
 	"github.com/rail44/plate/query"
 	"github.com/rail44/plate/tables"
 	"github.com/rail44/plate/types"
 )
 
-func ID(op ast.BinaryOp, value string) types.ExprOption[tables.Tag] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "id", op, fmt.Sprintf("p%d", i))
-	}
+// Column accessors for type-safe column references
+func ID() types.Column[tables.Tag] {
+	return types.Column[tables.Tag]{Name: "id"}
 }
 
-func Name(op ast.BinaryOp, value string) types.ExprOption[tables.Tag] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "name", op, fmt.Sprintf("p%d", i))
-	}
+func Name() types.Column[tables.Tag] {
+	return types.Column[tables.Tag]{Name: "name"}
 }
 
 func Limit(count int) types.QueryOption[tables.Tag] {
@@ -30,12 +22,12 @@ func Limit(count int) types.QueryOption[tables.Tag] {
 	}
 }
 
-func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Tag] {
+func OrderBy(column types.Column[tables.Tag], dir ast.Direction) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{}
 		}
-		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.CurrentAlias(), column, dir))
+		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.CurrentAlias(), column.Name, dir))
 	}
 }
 

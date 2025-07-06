@@ -1,7 +1,6 @@
 package post
 
 import (
-	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
 	"github.com/rail44/plate/query"
 	"github.com/rail44/plate/tables"
@@ -35,37 +34,23 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 	}
 }
 
-func ID(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "id", op, fmt.Sprintf("p%d", i))
-	}
+// Column accessors for type-safe column references
+func ID() types.Column[tables.Post] {
+	return types.Column[tables.Post]{Name: "id"}
 }
 
-func UserID(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "user_id", op, fmt.Sprintf("p%d", i))
-	}
+func UserID() types.Column[tables.Post] {
+	return types.Column[tables.Post]{Name: "user_id"}
 }
 
-func Title(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "title", op, fmt.Sprintf("p%d", i))
-	}
+func Title() types.Column[tables.Post] {
+	return types.Column[tables.Post]{Name: "title"}
 }
 
-func Content(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "content", op, fmt.Sprintf("p%d", i))
-	}
+func Content() types.Column[tables.Post] {
+	return types.Column[tables.Post]{Name: "content"}
 }
+
 
 func Limit(count int) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
@@ -83,12 +68,12 @@ func Or(opts ...types.ExprOption[tables.Post]) types.ExprOption[tables.Post] {
 	return query.Or(opts...)
 }
 
-func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {
+func OrderBy(column types.Column[tables.Post], dir ast.Direction) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{}
 		}
-		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.CurrentAlias(), column, dir))
+		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.CurrentAlias(), column.Name, dir))
 	}
 }
 
