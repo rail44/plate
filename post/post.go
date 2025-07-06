@@ -13,13 +13,18 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
-		// Register alias for target table using semantic naming
-		tableName := s.RegisterTableAlias("user", "author")
+		// 現在のパスを保存してからリレーションシップを登録
+		basePath := make([]string, len(s.RelationshipPath))
+		copy(basePath, s.RelationshipPath)
+		baseAlias := s.CurrentAlias()
+		
+		// Register relationship
+		tableName := s.RegisterRelationship("author")
 
 		// Create and apply JOIN
 		sl.From.Source = query.Join(query.JoinConfig{
 			Source:      sl.From.Source,
-			BaseTable:   s.WorkingTableAlias,
+			BaseTable:   baseAlias,
 			TargetTable: "user",
 			TargetAlias: tableName,
 			BaseKey:     "user_id",
@@ -28,14 +33,12 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 		})
 
 		// Apply options with the target table alias
-		previousAlias := s.WorkingTableAlias
-		s.WorkingTableAlias = tableName
 
 		for _, opt := range opts {
 			opt.Apply(s, q)
 		}
 
-		s.WorkingTableAlias = previousAlias
+		s.RelationshipPath = basePath
 	}
 }
 
@@ -43,7 +46,7 @@ func ID(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "id", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -51,7 +54,7 @@ func UserID(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "user_id", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "user_id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -59,7 +62,7 @@ func Title(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "title", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "title", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -67,7 +70,7 @@ func Content(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "content", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "content", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -105,7 +108,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{}
 		}
-		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.WorkingTableAlias, column, dir))
+		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.CurrentAlias(), column, dir))
 	}
 }
 
@@ -114,14 +117,19 @@ func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
+		// 現在のパスを保存してからリレーションシップを登録
+		basePath := make([]string, len(s.RelationshipPath))
+		copy(basePath, s.RelationshipPath)
+		baseAlias := s.CurrentAlias()
+
 		// Register aliases for junction and target tables
-		junctionAlias := s.RegisterTableAlias("post_tag", "post_tags_junction")
-		targetAlias := s.RegisterTableAlias("tag", "tags")
+		junctionAlias := s.RegisterJunctionTable("post_tag")
+		targetAlias := s.RegisterRelationship("tags")
 
 		// Create and apply JOIN
 		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
 			Source:        sl.From.Source,
-			BaseTable:     s.WorkingTableAlias,
+			BaseTable:     baseAlias,
 			JunctionTable: "post_tag",
 			JunctionAlias: junctionAlias,
 			TargetTable:   "tag",
@@ -144,13 +152,11 @@ func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 		})
 
 		// Apply options with the target table alias
-		previousAlias := s.WorkingTableAlias
-		s.WorkingTableAlias = targetAlias
 
 		for _, opt := range opts {
 			opt.Apply(s, q)
 		}
 
-		s.WorkingTableAlias = previousAlias
+		s.RelationshipPath = basePath
 	}
 }

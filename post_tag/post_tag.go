@@ -12,7 +12,7 @@ func PostID(op ast.BinaryOp, value string) types.ExprOption[tables.PostTag] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "post_id", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "post_id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -20,7 +20,7 @@ func TagID(op ast.BinaryOp, value string) types.ExprOption[tables.PostTag] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "tag_id", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "tag_id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -29,7 +29,7 @@ func CreatedAt(op ast.BinaryOp, value string) types.ExprOption[tables.PostTag] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "created_at", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "created_at", op, fmt.Sprintf("p%d", i))
 	}
 }
 

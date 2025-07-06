@@ -87,9 +87,9 @@ func Select[T types.Table](opts ...types.Option[T]) (string, []any) {
 	tableName := t.TableName()
 
 	s := &types.State{
-		Tables:            make(map[string]struct{}),
-		Params:            []any{},
-		WorkingTableAlias: tableName,
+		Tables:           make(map[string]struct{}),
+		Params:           []any{},
+		RelationshipPath: []string{tableName}, // ルートテーブルから開始
 	}
 	s.Tables[tableName] = struct{}{}
 

@@ -12,7 +12,7 @@ func ID(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "id", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "id", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -20,7 +20,7 @@ func Name(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "name", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "name", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -28,7 +28,7 @@ func Email(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.WorkingTableAlias, "email", op, fmt.Sprintf("p%d", i))
+		*expr = query.ColumnExpr(s.CurrentAlias(), "email", op, fmt.Sprintf("p%d", i))
 	}
 }
 
@@ -46,7 +46,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.User] {
 			}
 		}
 		q.OrderBy.Items = append(q.OrderBy.Items,
-			query.OrderByItem(s.WorkingTableAlias, column, dir))
+			query.OrderByItem(s.CurrentAlias(), column, dir))
 	}
 }
 
@@ -107,13 +107,18 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 
-		// Register alias for target table
-		tableName := s.RegisterTableAlias("post", "")
+		// 現在のパスを保存してからリレーションシップを登録
+		basePath := make([]string, len(s.RelationshipPath))
+		copy(basePath, s.RelationshipPath)
+		baseAlias := s.CurrentAlias()
+
+		// Register relationship
+		tableName := s.RegisterRelationship("posts")
 
 		// Create and apply JOIN
 		sl.From.Source = query.Join(query.JoinConfig{
 			Source:      sl.From.Source,
-			BaseTable:   s.WorkingTableAlias,
+			BaseTable:   baseAlias,
 			TargetTable: "post",
 			TargetAlias: tableName,
 			BaseKey:     "id",
@@ -122,13 +127,10 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 		})
 
 		// Apply options with the target table alias
-		previousAlias := s.WorkingTableAlias
-		s.WorkingTableAlias = tableName
-
 		for _, opt := range opts {
 			opt.Apply(s, q)
 		}
 
-		s.WorkingTableAlias = previousAlias
+		s.RelationshipPath = basePath
 	}
 }

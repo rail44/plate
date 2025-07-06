@@ -1,49 +1,54 @@
 package types
 
 import (
-	"fmt"
+	"strings"
 	"github.com/cloudspannerecosystem/memefish/ast"
 )
 
 type State struct {
-	Tables            map[string]struct{}
-	Params            []any
-	WorkingTableAlias string
+	Tables           map[string]struct{}
+	Params           []any
+	RelationshipPath []string // リレーションシップのパスを記録
 }
 
-// RegisterTableAlias finds an available alias based on the relationship context and registers it
-func (s *State) RegisterTableAlias(tableName, relationshipName string) string {
-	// Use relationship name as the base alias
-	baseAlias := relationshipName
-	if baseAlias == "" {
-		baseAlias = tableName
-	}
+// RegisterRelationship リレーションシップを辿ってエイリアスを登録
+func (s *State) RegisterRelationship(relationshipName string) string {
+	// パスに追加
+	s.RelationshipPath = append(s.RelationshipPath, relationshipName)
+	
+	// CurrentAliasを使用してエイリアスを取得
+	alias := s.CurrentAlias()
+	
+	s.Tables[alias] = struct{}{}
+	return alias
+}
 
-	// Check if the base alias is available
-	if _, exists := s.Tables[baseAlias]; !exists {
-		s.Tables[baseAlias] = struct{}{}
-		return baseAlias
+// RegisterJunctionTable 中間テーブル用（パスを進めずにエイリアスだけ生成）
+func (s *State) RegisterJunctionTable(tableName string) string {
+	// 現在のエイリアスに基づいた中間テーブル名を生成
+	currentAlias := s.CurrentAlias()
+	alias := ""
+	if currentAlias != "" {
+		alias = currentAlias + "_" + tableName
+	} else {
+		alias = tableName
 	}
+	
+	s.Tables[alias] = struct{}{}
+	return alias
+}
 
-	// If not, try with context prefix
-	if s.WorkingTableAlias != "" && s.WorkingTableAlias != tableName {
-		contextAlias := fmt.Sprintf("%s_%s", s.WorkingTableAlias, baseAlias)
-		if _, exists := s.Tables[contextAlias]; !exists {
-			s.Tables[contextAlias] = struct{}{}
-			return contextAlias
-		}
+// CurrentAlias 現在のパスからエイリアスを取得
+func (s *State) CurrentAlias() string {
+	if len(s.RelationshipPath) == 0 {
+		return ""
 	}
-
-	// Fall back to numbered suffix
-	counter := 1
-	for {
-		numberedAlias := fmt.Sprintf("%s%d", baseAlias, counter)
-		if _, exists := s.Tables[numberedAlias]; !exists {
-			s.Tables[numberedAlias] = struct{}{}
-			return numberedAlias
-		}
-		counter++
+	if len(s.RelationshipPath) == 1 {
+		// ルートテーブルの場合
+		return s.RelationshipPath[0]
 	}
+	// 2要素以上の場合は先頭を除いて結合
+	return strings.Join(s.RelationshipPath[1:], "_")
 }
 
 type Table interface {
