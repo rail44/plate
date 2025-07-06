@@ -103,7 +103,7 @@ func Paren(inner types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 }
 
 // Posts joins with post table (has_many relationship)
-func Posts(args ...interface{}) types.QueryOption[tables.User] {
+func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
@@ -122,20 +122,13 @@ func Posts(args ...interface{}) types.QueryOption[tables.User] {
 			JoinType:    ast.LeftOuterJoin,
 		})
 		
-		// Convert and apply options
-		if len(args) > 0 {
+		// Apply options with the target table alias
+		if len(opts) > 0 {
 			previousAlias := s.WorkingTableAlias
 			s.WorkingTableAlias = tableName
 			
-			for _, arg := range args {
-				switch v := arg.(type) {
-				case types.QueryOption[tables.Post]:
-					v(s, q)
-				case types.ExprOption[tables.Post]:
-					query.ConvertToQueryOption(v)(s, q)
-				default:
-					panic(fmt.Sprintf("unsupported option type: %T", v))
-				}
+			for _, opt := range opts {
+				opt.Apply(s, q)
 			}
 			
 			s.WorkingTableAlias = previousAlias

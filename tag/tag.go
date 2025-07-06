@@ -63,7 +63,7 @@ func Or(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 }
 
 // Posts joins with post table through post_tag junction table (many-to-many relationship)
-func Posts(args ...interface{}) types.QueryOption[tables.Tag] {
+func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
@@ -99,20 +99,13 @@ func Posts(args ...interface{}) types.QueryOption[tables.Tag] {
 			JoinType: ast.LeftOuterJoin,
 		})
 		
-		// Convert and apply options
-		if len(args) > 0 {
+		// Apply options with the target table alias
+		if len(opts) > 0 {
 			previousAlias := s.WorkingTableAlias
 			s.WorkingTableAlias = targetAlias
 			
-			for _, arg := range args {
-				switch v := arg.(type) {
-				case types.QueryOption[tables.Post]:
-					v(s, q)
-				case types.ExprOption[tables.Post]:
-					query.ConvertToQueryOption(v)(s, q)
-				default:
-					panic(fmt.Sprintf("unsupported option type: %T", v))
-				}
+			for _, opt := range opts {
+				opt.Apply(s, q)
 			}
 			
 			s.WorkingTableAlias = previousAlias

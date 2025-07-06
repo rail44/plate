@@ -9,7 +9,7 @@ import (
 )
 
 // Author joins with user table (belongs_to relationship)
-func Author(args ...interface{}) types.QueryOption[tables.Post] {
+func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
@@ -28,20 +28,13 @@ func Author(args ...interface{}) types.QueryOption[tables.Post] {
 			JoinType:    ast.InnerJoin,
 		})
 		
-		// Convert and apply options
-		if len(args) > 0 {
+		// Apply options with the target table alias
+		if len(opts) > 0 {
 			previousAlias := s.WorkingTableAlias
 			s.WorkingTableAlias = tableName
 			
-			for _, arg := range args {
-				switch v := arg.(type) {
-				case types.QueryOption[tables.User]:
-					v(s, q)
-				case types.ExprOption[tables.User]:
-					query.ConvertToQueryOption(v)(s, q)
-				default:
-					panic(fmt.Sprintf("unsupported option type: %T", v))
-				}
+			for _, opt := range opts {
+				opt.Apply(s, q)
 			}
 			
 			s.WorkingTableAlias = previousAlias
@@ -121,7 +114,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {
 }
 
 // Tags joins with tag table through post_tag junction table (many-to-many relationship)
-func Tags(args ...interface{}) types.QueryOption[tables.Post] {
+func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
@@ -157,20 +150,13 @@ func Tags(args ...interface{}) types.QueryOption[tables.Post] {
 			JoinType: ast.LeftOuterJoin,
 		})
 		
-		// Convert and apply options
-		if len(args) > 0 {
+		// Apply options with the target table alias
+		if len(opts) > 0 {
 			previousAlias := s.WorkingTableAlias
 			s.WorkingTableAlias = targetAlias
 			
-			for _, arg := range args {
-				switch v := arg.(type) {
-				case types.QueryOption[tables.Tag]:
-					v(s, q)
-				case types.ExprOption[tables.Tag]:
-					query.ConvertToQueryOption(v)(s, q)
-				default:
-					panic(fmt.Sprintf("unsupported option type: %T", v))
-				}
+			for _, opt := range opts {
+				opt.Apply(s, q)
 			}
 			
 			s.WorkingTableAlias = previousAlias
