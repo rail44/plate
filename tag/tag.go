@@ -44,10 +44,6 @@ func Or(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 		if len(opts) == 0 {
 			return
 		}
-		if len(opts) == 1 {
-			opts[0](s, expr)
-			return
-		}
 
 		var left ast.Expr
 		opts[0](s, &left)
@@ -58,7 +54,7 @@ func Or(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 			left = query.OrExpr(left, right)
 		}
 
-		*expr = query.ParenExpr(left)
+		*expr = left
 	}
 }
 

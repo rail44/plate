@@ -8,24 +8,24 @@ import (
 type State struct {
 	Tables           map[string]struct{}
 	Params           []any
-	RelationshipPath []string // リレーションシップのパスを記録
+	RelationshipPath []string // Track relationship path for alias generation
 }
 
-// registerRelationship リレーションシップを辿ってエイリアスを登録
+// registerRelationship registers a relationship and generates an alias
 func (s *State) registerRelationship(relationshipName string) string {
-	// パスに追加
+	// Add to path
 	s.RelationshipPath = append(s.RelationshipPath, relationshipName)
 	
-	// CurrentAliasを使用してエイリアスを取得
+	// Get alias using CurrentAlias
 	alias := s.CurrentAlias()
 	
 	s.Tables[alias] = struct{}{}
 	return alias
 }
 
-// RegisterJunction 中間テーブル用（パスを進めずにエイリアスだけ生成）
+// RegisterJunction registers a junction table alias without advancing the path
 func (s *State) RegisterJunction(tableName string) string {
-	// 現在のエイリアスに基づいた中間テーブル名を生成
+	// Generate junction table alias based on current alias
 	currentAlias := s.CurrentAlias()
 	alias := ""
 	if currentAlias != "" {
@@ -38,33 +38,33 @@ func (s *State) RegisterJunction(tableName string) string {
 	return alias
 }
 
-// CurrentAlias 現在のパスからエイリアスを取得
+// CurrentAlias gets the current alias from the relationship path
 func (s *State) CurrentAlias() string {
 	if len(s.RelationshipPath) == 0 {
 		return ""
 	}
 	if len(s.RelationshipPath) == 1 {
-		// ルートテーブルの場合
+		// Root table case
 		return s.RelationshipPath[0]
 	}
-	// 2要素以上の場合は先頭を除いて結合
+	// For 2+ elements, join all except the first
 	return strings.Join(s.RelationshipPath[1:], "_")
 }
 
-// WithRelationship リレーションシップのスコープ内で処理を実行
-// 注：このメソッドは主にJOINメソッドの実装で使用することを想定しています
+// WithRelationship executes a function within a relationship scope
+// Note: This method is primarily intended for use in JOIN method implementations
 func (s *State) WithRelationship(relationshipName string, fn func(alias string)) {
-	// パスを保存
+	// Save current path
 	basePath := make([]string, len(s.RelationshipPath))
 	copy(basePath, s.RelationshipPath)
 	
-	// リレーションシップを登録
+	// Register relationship
 	alias := s.registerRelationship(relationshipName)
 	
-	// スコープ内で処理を実行
+	// Execute function in scope
 	fn(alias)
 	
-	// パスを復元
+	// Restore path
 	s.RelationshipPath = basePath
 }
 
@@ -86,7 +86,20 @@ func (opt ExprOption[T]) Apply(s *State, q *ast.Query) {
 	if sl.Where == nil {
 		sl.Where = &ast.Where{}
 	}
-	opt(s, &sl.Where.Expr)
+	
+	var expr ast.Expr
+	opt(s, &expr)
+	
+	if sl.Where.Expr == nil {
+		sl.Where.Expr = expr
+	} else {
+		// Combine with existing WHERE using AND
+		sl.Where.Expr = &ast.BinaryExpr{
+			Op:    ast.OpAnd,
+			Left:  sl.Where.Expr,
+			Right: expr,
+		}
+	}
 }
 
 // QueryOption represents an option that modifies the entire query
