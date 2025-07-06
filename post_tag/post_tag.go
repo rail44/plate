@@ -1,44 +1,49 @@
 package post_tag
 
 import (
-	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
 	"github.com/rail44/plate/query"
 	"github.com/rail44/plate/tables"
 	"github.com/rail44/plate/types"
 )
 
-func PostID(op ast.BinaryOp, value string) types.ExprOption[tables.PostTag] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "post_id", op, fmt.Sprintf("p%d", i))
-	}
+// Column accessors for type-safe column references
+func PostID() types.Column[tables.PostTag, string] {
+	return types.Column[tables.PostTag, string]{Name: "post_id"}
 }
 
-func TagID(op ast.BinaryOp, value string) types.ExprOption[tables.PostTag] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "tag_id", op, fmt.Sprintf("p%d", i))
-	}
+func TagID() types.Column[tables.PostTag, string] {
+	return types.Column[tables.PostTag, string]{Name: "tag_id"}
 }
 
-// CreatedAt can be used for filtering when the tag was added to the post
-func CreatedAt(op ast.BinaryOp, value string) types.ExprOption[tables.PostTag] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "created_at", op, fmt.Sprintf("p%d", i))
-	}
+func CreatedAt() types.Column[tables.PostTag, string] {
+	return types.Column[tables.PostTag, string]{Name: "created_at"}
 }
 
-func Where(opt types.ExprOption[tables.PostTag]) types.QueryOption[tables.PostTag] {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-		if sl.Where == nil {
-			sl.Where = &ast.Where{}
-		}
-		opt(s, &sl.Where.Expr)
-	}
+func Limit(count int) types.QueryOption[tables.PostTag] {
+	return query.LimitOption[tables.PostTag](count)
+}
+
+func OrderBy[V any](column types.Column[tables.PostTag, V], dir ast.Direction) types.QueryOption[tables.PostTag] {
+	return query.OrderBy(column, dir)
+}
+
+// WithInnerJoin changes the JOIN type to INNER JOIN
+func WithInnerJoin() types.QueryOption[tables.PostTag] {
+	return query.WithInnerJoinOption[tables.PostTag]()
+}
+
+// And creates an AND condition that groups multiple conditions
+func And(opts ...types.ExprOption[tables.PostTag]) types.ExprOption[tables.PostTag] {
+	return query.And(opts...)
+}
+
+// Or creates an OR condition from multiple conditions
+func Or(opts ...types.ExprOption[tables.PostTag]) types.ExprOption[tables.PostTag] {
+	return query.Or(opts...)
+}
+
+// Not creates a logical NOT condition that wraps any ExprOption
+func Not(opt types.ExprOption[tables.PostTag]) types.ExprOption[tables.PostTag] {
+	return query.Not(opt)
 }

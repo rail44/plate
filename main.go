@@ -237,4 +237,58 @@ func main() {
 		post.OrderBy(post.Title(), ast.DirectionAsc),
 	)
 	printExample("String-specific methods (Like/NotLike)", sql20, params20)
+
+	printSection("NOT Function Examples")
+
+	// Example: Simple negation
+	sql21, params21 := query.Select[tables.User](
+		user.Not(user.Name().Eq("Admin")),
+		user.OrderBy(user.Name(), ast.DirectionAsc),
+	)
+	printExample("Simple NOT condition", sql21, params21)
+
+	// Example: Complex AND negation - NOT (name = 'Admin' AND email LIKE '%@company.com')
+	sql22, params22 := query.Select[tables.User](
+		user.Not(user.And(
+			user.Name().Eq("Admin"),
+			user.Email().Like("%@company.com"),
+		)),
+		user.OrderBy(user.Name(), ast.DirectionAsc),
+	)
+	printExample("NOT with complex AND condition", sql22, params22)
+
+	// Example: OR negation - NOT (name = 'Admin' OR name = 'System')
+	sql23, params23 := query.Select[tables.User](
+		user.Not(user.Or(
+			user.Name().Eq("Admin"),
+			user.Name().Eq("System"),
+		)),
+		user.Email().IsNotNull(),
+		user.OrderBy(user.Name(), ast.DirectionAsc),
+	)
+	printExample("NOT with OR condition", sql23, params23)
+
+	// Example: NOT with IN condition
+	sql24, params24 := query.Select[tables.User](
+		user.Not(user.ID().In("1", "2", "3")),
+		user.Name().Like("J%"),
+		user.OrderBy(user.ID(), ast.DirectionAsc),
+	)
+	printExample("NOT with IN condition", sql24, params24)
+
+	// Example: NOT with complex boolean logic - NOT ((a AND b) OR (c AND d))
+	sql25, params25 := query.Select[tables.User](
+		user.Not(user.Or(
+			user.And(
+				user.Name().Eq("John"),
+				user.Email().Like("%@example.com"),
+			),
+			user.And(
+				user.Name().Eq("Jane"),
+				user.Email().Like("%@test.com"),
+			),
+		)),
+		user.OrderBy(user.Name(), ast.DirectionAsc),
+	)
+	printExample("NOT with complex boolean logic", sql25, params25)
 }

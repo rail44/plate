@@ -234,3 +234,49 @@ func Join(config JoinConfig) *ast.Join {
 		},
 	}
 }
+
+// OrderBy creates an ORDER BY clause for any table type
+func OrderBy[T types.Table, V any](column types.Column[T, V], dir ast.Direction) types.QueryOption[T] {
+	return func(s *types.State, q *ast.Query) {
+		if q.OrderBy == nil {
+			q.OrderBy = &ast.OrderBy{
+				Items: []*ast.OrderByItem{},
+			}
+		}
+		q.OrderBy.Items = append(q.OrderBy.Items, OrderByItem(s.CurrentAlias(), column.Name, dir))
+	}
+}
+
+// Not creates a logical NOT condition that wraps any ExprOption
+// This allows negation of complex expressions including And() and Or() combinations
+func Not[T types.Table](opt types.ExprOption[T]) types.ExprOption[T] {
+	return func(s *types.State, expr *ast.Expr) {
+		// Build the inner expression first
+		opt(s, expr)
+		
+		// Wrap with NOT
+		*expr = &ast.UnaryExpr{
+			Op:   ast.OpNot,
+			Expr: *expr,
+		}
+	}
+}
+
+// LimitOption creates a LIMIT clause for any table type
+func LimitOption[T types.Table](count int) types.QueryOption[T] {
+	return func(s *types.State, q *ast.Query) {
+		q.Limit = Limit(count)
+	}
+}
+
+// WithInnerJoinOption changes the JOIN type to INNER JOIN for any table type
+func WithInnerJoinOption[T types.Table]() types.QueryOption[T] {
+	return func(s *types.State, q *ast.Query) {
+		// Find the last JOIN and change its type
+		if sl, ok := q.Query.(*ast.Select); ok {
+			if join := FindLastJoin(sl.From.Source); join != nil {
+				join.Op = ast.InnerJoin
+			}
+		}
+	}
+}

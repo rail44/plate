@@ -254,3 +254,4 @@ func (c Column[T, V]) IsNotNull() ExprOption[T] {
 		}
 	}
 }
+

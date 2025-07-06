@@ -53,9 +53,7 @@ func Content() types.Column[tables.Post, string] {
 
 
 func Limit(count int) types.QueryOption[tables.Post] {
-	return func(s *types.State, q *ast.Query) {
-		q.Limit = query.Limit(count)
-	}
+	return query.LimitOption[tables.Post](count)
 }
 
 // And creates an AND condition that groups multiple conditions
@@ -68,25 +66,18 @@ func Or(opts ...types.ExprOption[tables.Post]) types.ExprOption[tables.Post] {
 	return query.Or(opts...)
 }
 
+// Not creates a logical NOT condition that wraps any ExprOption
+func Not(opt types.ExprOption[tables.Post]) types.ExprOption[tables.Post] {
+	return query.Not(opt)
+}
+
 func OrderBy[V any](column types.Column[tables.Post, V], dir ast.Direction) types.QueryOption[tables.Post] {
-	return func(s *types.State, q *ast.Query) {
-		if q.OrderBy == nil {
-			q.OrderBy = &ast.OrderBy{}
-		}
-		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.CurrentAlias(), column.Name, dir))
-	}
+	return query.OrderBy(column, dir)
 }
 
 // WithInnerJoin changes the JOIN type to INNER JOIN
 func WithInnerJoin() types.QueryOption[tables.Post] {
-	return func(s *types.State, q *ast.Query) {
-		// Find the last JOIN and change its type
-		if sl, ok := q.Query.(*ast.Select); ok {
-			if join := query.FindLastJoin(sl.From.Source); join != nil {
-				join.Op = ast.InnerJoin
-			}
-		}
-	}
+	return query.WithInnerJoinOption[tables.Post]()
 }
 
 // Tags joins with tag table through post_tag junction table (many-to-many relationship)
