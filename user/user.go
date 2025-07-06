@@ -60,13 +60,13 @@ const (
 func Or(conditions ...types.ExprOption[tables.User]) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
-		
+
 		// Build the OR expression from all conditions
 		var orExpr ast.Expr
 		for i, cond := range conditions {
 			var expr ast.Expr
 			cond(s, &expr)
-			
+
 			if i == 0 {
 				orExpr = expr
 			} else {
@@ -77,7 +77,7 @@ func Or(conditions ...types.ExprOption[tables.User]) types.QueryOption[tables.Us
 				}
 			}
 		}
-		
+
 		// Add to WHERE clause
 		if sl.Where == nil {
 			sl.Where = &ast.Where{Expr: orExpr}
@@ -106,11 +106,10 @@ func Paren(inner types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
-		
-		// Find available alias for target table
-		tableName := query.FindTableAlias(s, "post")
-		s.Tables[tableName] = struct{}{}
-		
+
+		// Register alias for target table
+		tableName := s.RegisterTableAlias("post", "")
+
 		// Create and apply JOIN
 		sl.From.Source = query.Join(query.JoinConfig{
 			Source:      sl.From.Source,
@@ -121,16 +120,15 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 			TargetKey:   "user_id",
 			JoinType:    ast.LeftOuterJoin,
 		})
-		
+
 		// Apply options with the target table alias
 		previousAlias := s.WorkingTableAlias
 		s.WorkingTableAlias = tableName
-		
+
 		for _, opt := range opts {
 			opt.Apply(s, q)
 		}
-		
+
 		s.WorkingTableAlias = previousAlias
 	}
 }
-

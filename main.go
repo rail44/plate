@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"github.com/cloudspannerecosystem/memefish/ast"
+	"strings"
 
 	"github.com/rail44/plate/post"
 	"github.com/rail44/plate/query"
@@ -24,7 +24,7 @@ func printSection(title string) {
 
 func main() {
 	printSection("Basic SELECT Examples")
-	
+
 	// Example: Find a specific user with pagination
 	// Use case: User search, profile lookup
 	sql1, params1 := query.Select[tables.User](
@@ -45,7 +45,7 @@ func main() {
 		user.OrderBy("name", ast.DirectionAsc),
 	)
 	printExample("OR condition with multiple filters", sql2, params2)
-	
+
 	// Example: Find admin users from a specific company
 	// Use case: Permission checks, admin user identification
 	sql3, params3 := query.Select[tables.User](
@@ -59,7 +59,7 @@ func main() {
 	printExample("Complex nested conditions", sql3, params3)
 
 	printSection("One-to-Many Relationship Examples")
-	
+
 	// Example: Get all users with their posts (including users without posts)
 	// Use case: User dashboard, activity overview
 	sql4, params4 := query.Select[tables.User](
@@ -67,7 +67,7 @@ func main() {
 		user.OrderBy("name", ast.DirectionAsc),
 	)
 	printExample("All users with posts (LEFT JOIN)", sql4, params4)
-	
+
 	// Example: Find non-admin users who have important posts
 	// Use case: Content moderation, important content tracking
 	sql5, params5 := query.Select[tables.User](
@@ -76,7 +76,7 @@ func main() {
 		user.OrderBy("name", ast.DirectionAsc),
 	)
 	printExample("Users with filtered posts", sql5, params5)
-	
+
 	// Example: Find company announcements with author information
 	// Use case: Company news feed, official announcements
 	sql6, params6 := query.Select[tables.Post](
@@ -88,7 +88,7 @@ func main() {
 	printExample("Posts with author filter (INNER JOIN)", sql6, params6)
 
 	printSection("Many-to-Many Relationship Examples")
-	
+
 	// Example: Find Go tutorials
 	// Use case: Tag-based content filtering, topic search
 	sql7, params7 := query.Select[tables.Post](
@@ -97,7 +97,7 @@ func main() {
 		post.OrderBy("created_at", ast.DirectionDesc),
 	)
 	printExample("Posts with specific tag (through junction table)", sql7, params7)
-	
+
 	// Example: Find user-generated content with specific tags
 	// Use case: Community content, excluding official posts
 	sql8, params8 := query.Select[tables.Post](
@@ -109,7 +109,7 @@ func main() {
 		post.Limit(20),
 	)
 	printExample("Posts with OR tag conditions and author filter", sql8, params8)
-	
+
 	// Example: Find tech tags used in announcements
 	// Use case: Tag analytics, content categorization
 	sql9, params9 := query.Select[tables.Tag](
@@ -118,9 +118,9 @@ func main() {
 		tag.OrderBy("name", ast.DirectionAsc),
 	)
 	printExample("Tags used in specific posts", sql9, params9)
-	
+
 	printSection("Multi-level JOIN Examples")
-	
+
 	// Example: Complete user profile with all posts and tags
 	// Use case: User profile page, export user data
 	sql10, params10 := query.Select[tables.User](
@@ -131,7 +131,7 @@ func main() {
 		),
 	)
 	printExample("User → Posts → Tags (3-level JOIN)", sql10, params10)
-	
+
 	// Example: Find tutorial authors for a specific technology
 	// Use case: Expert identification, content contributor search
 	sql11, params11 := query.Select[tables.User](
@@ -144,7 +144,7 @@ func main() {
 		user.OrderBy("name", ast.DirectionAsc),
 	)
 	printExample("Users with Go tutorial posts (filtered multi-level)", sql11, params11)
-	
+
 	// Example: Analyze tag usage in company communications
 	// Use case: Content strategy, tag effectiveness analysis
 	sql12, params12 := query.Select[tables.Tag](

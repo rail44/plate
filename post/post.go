@@ -12,10 +12,10 @@ import (
 func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
-		
+
 		// Register alias for target table using semantic naming
 		tableName := s.RegisterTableAlias("user", "author")
-		
+
 		// Create and apply JOIN
 		sl.From.Source = query.Join(query.JoinConfig{
 			Source:      sl.From.Source,
@@ -26,19 +26,18 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 			TargetKey:   "id",
 			JoinType:    ast.InnerJoin,
 		})
-		
+
 		// Apply options with the target table alias
 		previousAlias := s.WorkingTableAlias
 		s.WorkingTableAlias = tableName
-		
+
 		for _, opt := range opts {
 			opt.Apply(s, q)
 		}
-		
+
 		s.WorkingTableAlias = previousAlias
 	}
 }
-
 
 func ID(op ast.BinaryOp, value string) types.ExprOption[tables.Post] {
 	return func(s *types.State, expr *ast.Expr) {
@@ -114,11 +113,11 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {
 func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
-		
+
 		// Register aliases for junction and target tables
 		junctionAlias := s.RegisterTableAlias("post_tag", "post_tags_junction")
 		targetAlias := s.RegisterTableAlias("tag", "tags")
-		
+
 		// Create and apply JOIN
 		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
 			Source:        sl.From.Source,
@@ -143,15 +142,15 @@ func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 			},
 			JoinType: ast.LeftOuterJoin,
 		})
-		
+
 		// Apply options with the target table alias
 		previousAlias := s.WorkingTableAlias
 		s.WorkingTableAlias = targetAlias
-		
+
 		for _, opt := range opts {
 			opt.Apply(s, q)
 		}
-		
+
 		s.WorkingTableAlias = previousAlias
 	}
 }

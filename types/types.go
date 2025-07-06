@@ -18,13 +18,13 @@ func (s *State) RegisterTableAlias(tableName, relationshipName string) string {
 	if baseAlias == "" {
 		baseAlias = tableName
 	}
-	
+
 	// Check if the base alias is available
 	if _, exists := s.Tables[baseAlias]; !exists {
 		s.Tables[baseAlias] = struct{}{}
 		return baseAlias
 	}
-	
+
 	// If not, try with context prefix
 	if s.WorkingTableAlias != "" && s.WorkingTableAlias != tableName {
 		contextAlias := fmt.Sprintf("%s_%s", s.WorkingTableAlias, baseAlias)
@@ -33,7 +33,7 @@ func (s *State) RegisterTableAlias(tableName, relationshipName string) string {
 			return contextAlias
 		}
 	}
-	
+
 	// Fall back to numbered suffix
 	counter := 1
 	for {

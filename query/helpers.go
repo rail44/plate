@@ -81,12 +81,11 @@ func ColumnExpr(tableAlias, column string, op ast.BinaryOp, paramName string) as
 	}
 }
 
-
 // Select is a generic select function for any table
 func Select[T types.Table](opts ...types.Option[T]) (string, []any) {
 	var t T
 	tableName := t.TableName()
-	
+
 	s := &types.State{
 		Tables:            make(map[string]struct{}),
 		Params:            []any{},
@@ -118,7 +117,6 @@ func Select[T types.Table](opts ...types.Option[T]) (string, []any) {
 	return q.SQL(), s.Params
 }
 
-
 // JoinConfig contains configuration for building JOIN clauses
 type JoinConfig struct {
 	Source      ast.TableExpr
@@ -127,18 +125,18 @@ type JoinConfig struct {
 	TargetAlias string
 	BaseKey     string
 	TargetKey   string
-	JoinType    ast.JoinOp  // JOIN type (INNER, LEFT OUTER, etc.)
+	JoinType    ast.JoinOp // JOIN type (INNER, LEFT OUTER, etc.)
 }
 
 // JoinThroughConfig contains configuration for building many-to-many JOIN through a junction table
 type JoinThroughConfig struct {
-	Source          ast.TableExpr
-	BaseTable       string
-	JunctionTable   string
-	JunctionAlias   string
-	TargetTable     string
-	TargetAlias     string
-	BaseToJunction  struct {
+	Source         ast.TableExpr
+	BaseTable      string
+	JunctionTable  string
+	JunctionAlias  string
+	TargetTable    string
+	TargetAlias    string
+	BaseToJunction struct {
 		BaseKey     string
 		JunctionKey string
 	}
@@ -173,23 +171,6 @@ func JoinThrough(config JoinThroughConfig) *ast.Join {
 		JoinType:    config.JoinType,
 	})
 }
-
-// FindTableAlias finds an available alias for the given table name
-func FindTableAlias(s *types.State, baseTableName string) string {
-	tableName := baseTableName
-	counter := 1
-	
-	for {
-		if _, exists := s.Tables[tableName]; !exists {
-			break
-		}
-		tableName = fmt.Sprintf("%s%d", baseTableName, counter)
-		counter++
-	}
-	
-	return tableName
-}
-
 
 // Join creates a JOIN AST node
 func Join(config JoinConfig) *ast.Join {

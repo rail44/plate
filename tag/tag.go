@@ -66,11 +66,11 @@ func Or(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
-		
+
 		// Register aliases for junction and target tables
 		junctionAlias := s.RegisterTableAlias("post_tag", "tag_posts_junction")
 		targetAlias := s.RegisterTableAlias("post", "posts")
-		
+
 		// Create and apply JOIN
 		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
 			Source:        sl.From.Source,
@@ -95,15 +95,15 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
 			},
 			JoinType: ast.LeftOuterJoin,
 		})
-		
+
 		// Apply options with the target table alias
 		previousAlias := s.WorkingTableAlias
 		s.WorkingTableAlias = targetAlias
-		
+
 		for _, opt := range opts {
 			opt.Apply(s, q)
 		}
-		
+
 		s.WorkingTableAlias = previousAlias
 	}
 }
