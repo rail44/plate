@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 	
 	"github.com/cloudspannerecosystem/memefish/ast"
 	"github.com/rail44/plate/examples/generated/post"
@@ -194,8 +195,71 @@ func TestLogicalOperators(t *testing.T) {
 					user.Not(user.Name().Eq("Admin")),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE NOT user.name = @p0",
+			wantSQL:  "SELECT * FROM user WHERE NOT (user.name = @p0)",
 			wantArgs: []any{"Admin"},
+		},
+		{
+			name: "NOT with OR condition",
+			query: func() (string, []any) {
+				return user.Select(
+					user.Not(user.Or(
+						user.Name().Eq("Admin"),
+						user.Name().Eq("Root"),
+					)),
+				)
+			},
+			wantSQL:  "SELECT * FROM user WHERE NOT (user.name = @p0 OR user.name = @p1)",
+			wantArgs: []any{"Admin", "Root"},
+		},
+		{
+			name: "NOT with AND condition",
+			query: func() (string, []any) {
+				return user.Select(
+					user.Not(user.And(
+						user.Name().Eq("Alice"),
+						user.Email().Like("%@admin.com"),
+					)),
+				)
+			},
+			wantSQL:  "SELECT * FROM user WHERE NOT (user.name = @p0 AND user.email LIKE @p1)",
+			wantArgs: []any{"Alice", "%@admin.com"},
+		},
+		{
+			name: "Complex NOT precedence",
+			query: func() (string, []any) {
+				return user.Select(
+					user.And(
+						user.Not(user.Name().Eq("Admin")),
+						user.Email().Like("%@example.com"),
+					),
+				)
+			},
+			wantSQL:  "SELECT * FROM user WHERE (NOT (user.name = @p0) AND user.email LIKE @p1)",
+			wantArgs: []any{"Admin", "%@example.com"},
+		},
+		{
+			name: "NOT precedence with inequality",
+			query: func() (string, []any) {
+				testTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+				return user.Select(
+					user.Not(user.CreatedAt().Gt(testTime)),
+				)
+			},
+			wantSQL:  "SELECT * FROM user WHERE NOT (user.created_at > @p0)",
+			wantArgs: []any{time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+		},
+		{
+			name: "Multiple NOT conditions",
+			query: func() (string, []any) {
+				return user.Select(
+					user.And(
+						user.Not(user.Name().Eq("Admin")),
+						user.Not(user.Name().Eq("Root")),
+					),
+				)
+			},
+			wantSQL:  "SELECT * FROM user WHERE (NOT (user.name = @p0) AND NOT (user.name = @p1))",
+			wantArgs: []any{"Admin", "Root"},
 		},
 	}
 

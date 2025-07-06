@@ -221,10 +221,22 @@ func Not[T types.Table](opt types.ExprOption[T]) types.ExprOption[T] {
 		// Build the inner expression first
 		opt(s, expr)
 
-		// Wrap with NOT
-		*expr = &ast.UnaryExpr{
-			Op:   ast.OpNot,
-			Expr: *expr,
+		// Check if the expression already has parentheses
+		// ParenExpr means it's already wrapped (from And/Or)
+		if _, isParenExpr := (*expr).(*ast.ParenExpr); isParenExpr {
+			// Already has parentheses, just wrap with NOT
+			*expr = &ast.UnaryExpr{
+				Op:   ast.OpNot,
+				Expr: *expr,
+			}
+		} else {
+			// Simple expression, add parentheses for clarity
+			*expr = &ast.UnaryExpr{
+				Op: ast.OpNot,
+				Expr: &ast.ParenExpr{
+					Expr: *expr,
+				},
+			}
 		}
 	}
 }
