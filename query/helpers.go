@@ -186,8 +186,10 @@ func Select[T types.Table](args ...interface{}) (string, []any) {
 
 // JoinConfig contains configuration for building JOIN clauses
 type JoinConfig struct {
+	Source      ast.TableExpr
 	BaseTable   string
 	TargetTable string
+	TargetAlias string
 	BaseKey     string
 	TargetKey   string
 	JoinType    ast.JoinOp  // JOIN type (INNER, LEFT OUTER, etc.)
@@ -195,9 +197,12 @@ type JoinConfig struct {
 
 // JoinThroughConfig contains configuration for building many-to-many JOIN through a junction table
 type JoinThroughConfig struct {
+	Source          ast.TableExpr
 	BaseTable       string
 	JunctionTable   string
+	JunctionAlias   string
 	TargetTable     string
+	TargetAlias     string
 	BaseToJunction  struct {
 		BaseKey     string
 		JunctionKey string
@@ -209,120 +214,73 @@ type JoinThroughConfig struct {
 	JoinType ast.JoinOp
 }
 
-// JoinThrough creates a many-to-many JOIN operation through a junction table
-func JoinThrough(config JoinThroughConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
-	return func(s *types.State, q *ast.Query) {
-		// First apply junction table join
-		junctionJoin := Join(JoinConfig{
-			BaseTable:   config.BaseTable,
-			TargetTable: config.JunctionTable,
-			BaseKey:     config.BaseToJunction.BaseKey,
-			TargetKey:   config.BaseToJunction.JunctionKey,
-			JoinType:    config.JoinType,
-		}, nil)
-		junctionJoin(s, q)
+// JoinThrough creates a many-to-many JOIN through a junction table
+func JoinThrough(config JoinThroughConfig) *ast.Join {
+	// First create junction table join
+	junctionJoin := Join(JoinConfig{
+		Source:      config.Source,
+		BaseTable:   config.BaseTable,
+		TargetTable: config.JunctionTable,
+		TargetAlias: config.JunctionAlias,
+		BaseKey:     config.BaseToJunction.BaseKey,
+		TargetKey:   config.BaseToJunction.JunctionKey,
+		JoinType:    config.JoinType,
+	})
 
-		// Then apply target table join
-		targetJoin := Join(JoinConfig{
-			BaseTable:   config.JunctionTable,
-			TargetTable: config.TargetTable,
-			BaseKey:     config.JunctionToTarget.JunctionKey,
-			TargetKey:   config.JunctionToTarget.TargetKey,
-			JoinType:    config.JoinType,
-		}, whereOpt)
-		targetJoin(s, q)
-	}
+	// Then create target table join using junction join as source
+	return Join(JoinConfig{
+		Source:      junctionJoin,
+		BaseTable:   config.JunctionAlias,
+		TargetTable: config.TargetTable,
+		TargetAlias: config.TargetAlias,
+		BaseKey:     config.JunctionToTarget.JunctionKey,
+		TargetKey:   config.JunctionToTarget.TargetKey,
+		JoinType:    config.JoinType,
+	})
 }
 
-// Join creates a JOIN operation with the given configuration
-func Join(config JoinConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-
-		// Find available alias for target table
-		baseTableName := config.TargetTable
-		tableName := baseTableName
-		counter := 1
-
-		// Check if table name is already used and find available alias
-		for {
-			if _, exists := s.Tables[tableName]; !exists {
-				break
-			}
-			tableName = fmt.Sprintf("%s%d", baseTableName, counter)
-			counter++
+// FindTableAlias finds an available alias for the given table name
+func FindTableAlias(s *types.State, baseTableName string) string {
+	tableName := baseTableName
+	counter := 1
+	
+	for {
+		if _, exists := s.Tables[tableName]; !exists {
+			break
 		}
+		tableName = fmt.Sprintf("%s%d", baseTableName, counter)
+		counter++
+	}
+	
+	return tableName
+}
 
-		// Add table to state
-		s.Tables[tableName] = struct{}{}
-
-		// Save current working table alias
-		previousAlias := s.WorkingTableAlias
-
-		// Create JOIN structure
-		join := &ast.Join{
-			Left: sl.From.Source,
-			Op:   config.JoinType,
-			Right: &ast.TableName{
-				Table: &ast.Ident{
-					Name: tableName,
-				},
+// Join creates a JOIN AST node
+func Join(config JoinConfig) *ast.Join {
+	return &ast.Join{
+		Left: config.Source,
+		Op:   config.JoinType,
+		Right: &ast.TableName{
+			Table: &ast.Ident{
+				Name: config.TargetAlias,
 			},
-			Cond: &ast.On{
-				Expr: &ast.BinaryExpr{
-					Left: &ast.Path{
-						Idents: []*ast.Ident{
-							{Name: config.BaseTable},
-							{Name: config.BaseKey},
-						},
+		},
+		Cond: &ast.On{
+			Expr: &ast.BinaryExpr{
+				Left: &ast.Path{
+					Idents: []*ast.Ident{
+						{Name: config.BaseTable},
+						{Name: config.BaseKey},
 					},
-					Op: ast.OpEqual,
-					Right: &ast.Path{
-						Idents: []*ast.Ident{
-							{Name: tableName},
-							{Name: config.TargetKey},
-						},
+				},
+				Op: ast.OpEqual,
+				Right: &ast.Path{
+					Idents: []*ast.Ident{
+						{Name: config.TargetAlias},
+						{Name: config.TargetKey},
 					},
 				},
 			},
-		}
-
-		// Replace the FROM source with the JOIN
-		sl.From.Source = join
-
-		// Apply WHERE condition if provided
-		if whereOpt != nil {
-			// Set working table alias for target table expressions
-			s.WorkingTableAlias = tableName
-
-			// Create expression holder
-			var expr ast.Expr
-			whereOpt(s, &expr)
-
-			// Only add WHERE clause if expression was actually set
-			if expr != nil {
-				// Initialize WHERE clause if not exists
-				if sl.Where == nil {
-					sl.Where = &ast.Where{}
-				}
-
-				// If there's already a WHERE clause expression, combine with AND
-				if sl.Where.Expr != nil {
-					existingExpr := sl.Where.Expr
-					sl.Where.Expr = &ast.ParenExpr{
-						Expr: &ast.BinaryExpr{
-							Op:    ast.OpAnd,
-							Left:  existingExpr,
-							Right: expr,
-						},
-					}
-				} else {
-					sl.Where.Expr = expr
-				}
-			}
-
-			// Restore previous working table alias
-			s.WorkingTableAlias = previousAlias
-		}
+		},
 	}
 }

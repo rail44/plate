@@ -5,7 +5,6 @@ import (
 	"github.com/cloudspannerecosystem/memefish/ast"
 
 	"github.com/rail44/plate/post"
-	"github.com/rail44/plate/profile"
 	"github.com/rail44/plate/query"
 	"github.com/rail44/plate/tables"
 	"github.com/rail44/plate/tag"
@@ -13,29 +12,6 @@ import (
 )
 
 func main() {
-	// User -> Profile JOIN
-	sql1, params1 := query.Select[tables.User](
-		user.JoinProfile(nil),
-	)
-	fmt.Printf("User->Profile JOIN only: %s (params: %v)\n", sql1, params1)
-
-	sql2, params2 := query.Select[tables.User](
-		user.JoinProfile(profile.Bio(ast.OpEqual, "Engineer")),
-	)
-	fmt.Printf("User->Profile JOIN with condition: %s (params: %v)\n", sql2, params2)
-
-	// Profile -> User JOIN (新機能!)
-	sql3, params3 := query.Select[tables.Profile](
-		profile.JoinUser(nil),
-	)
-	fmt.Printf("Profile->User JOIN only: %s (params: %v)\n", sql3, params3)
-
-	sql4, params4 := query.Select[tables.Profile](
-		profile.JoinUser(user.Name(ast.OpEqual, "John")),
-		profile.Where(profile.Bio(ast.OpEqual, "Engineer")),
-	)
-	fmt.Printf("Profile->User JOIN with conditions: %s (params: %v)\n", sql4, params4)
-
 	// Whereを省略した新しいスタイル
 	sql5, params5 := query.Select[tables.User](
 		user.Name(ast.OpEqual, "John"),
@@ -43,14 +19,6 @@ func main() {
 	)
 	fmt.Printf("SELECT with LIMIT: %s (params: %v)\n", sql5, params5)
 
-	sql6, params6 := query.Select[tables.User](
-		user.JoinProfile(profile.Bio(ast.OpEqual, "Engineer")),
-		user.Name(ast.OpEqual, "John"),
-		user.Email(ast.OpLike, "%@example.com"),
-		user.Limit(5),
-	)
-	fmt.Printf("JOIN with multiple conditions: %s (params: %v)\n", sql6, params6)
-	
 	// シンプルなOR条件
 	sql7, params7 := query.Select[tables.User](
 		user.Or(
@@ -76,26 +44,6 @@ func main() {
 
 	// LEFT OUTER JOINの例
 	fmt.Println("\n--- LEFT OUTER JOIN Examples ---")
-	
-	// User -> Profile LEFT JOIN (プロフィールがないユーザーも含む)
-	sql9, params9 := query.Select[tables.User](
-		user.LeftJoinProfile(nil),
-	)
-	fmt.Printf("User LEFT JOIN Profile: %s (params: %v)\n", sql9, params9)
-	
-	// User -> Profile LEFT JOIN with condition
-	sql10, params10 := query.Select[tables.User](
-		user.LeftJoinProfile(profile.Bio(ast.OpEqual, "Engineer")),
-		user.Name(ast.OpLike, "J%"),
-	)
-	fmt.Printf("User LEFT JOIN Profile with conditions: %s (params: %v)\n", sql10, params10)
-	
-	// Profile -> User LEFT JOIN (ユーザーがいないプロフィールも含む)
-	sql11, params11 := query.Select[tables.Profile](
-		profile.LeftJoinUser(user.Email(ast.OpLike, "%@company.com")),
-		profile.Bio(ast.OpNotEqual, ""),
-	)
-	fmt.Printf("Profile LEFT JOIN User with conditions: %s (params: %v)\n", sql11, params11)
 
 	// 1対多の関係のJOIN例
 	fmt.Println("\n--- 1-to-Many JOIN Examples ---")

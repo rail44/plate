@@ -10,17 +10,53 @@ import (
 
 // Author joins with user table (belongs_to relationship)
 func Author(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.Post] {
-	return types.QueryOption[tables.Post](query.Join(query.JoinConfig{
-		BaseTable:   "post",
-		TargetTable: "user",
-		BaseKey:     "user_id",
-		TargetKey:   "id",
-		JoinType:    ast.InnerJoin,
-	}, func(s *types.State, expr *ast.Expr) {
+	return func(s *types.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
+		
+		// Find available alias for target table
+		tableName := query.FindTableAlias(s, "user")
+		s.Tables[tableName] = struct{}{}
+		
+		// Create and apply JOIN
+		sl.From.Source = query.Join(query.JoinConfig{
+			Source:      sl.From.Source,
+			BaseTable:   "post",
+			TargetTable: "user",
+			TargetAlias: tableName,
+			BaseKey:     "user_id",
+			TargetKey:   "id",
+			JoinType:    ast.InnerJoin,
+		})
+		
+		// Apply WHERE condition if provided
 		if whereOpt != nil {
-			whereOpt(s, expr)
+			previousAlias := s.WorkingTableAlias
+			s.WorkingTableAlias = tableName
+			
+			var expr ast.Expr
+			whereOpt(s, &expr)
+			
+			if expr != nil {
+				if sl.Where == nil {
+					sl.Where = &ast.Where{}
+				}
+				
+				if sl.Where.Expr != nil {
+					sl.Where.Expr = &ast.ParenExpr{
+						Expr: &ast.BinaryExpr{
+							Op:    ast.OpAnd,
+							Left:  sl.Where.Expr,
+							Right: expr,
+						},
+					}
+				} else {
+					sl.Where.Expr = expr
+				}
+			}
+			
+			s.WorkingTableAlias = previousAlias
 		}
-	}))
+	}
 }
 
 
@@ -106,28 +142,68 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {
 
 // Tags joins with tag table through post_tag junction table (many-to-many relationship)
 func Tags(whereOpt types.ExprOption[tables.Tag]) types.QueryOption[tables.Post] {
-	return types.QueryOption[tables.Post](query.JoinThrough(query.JoinThroughConfig{
-		BaseTable:     "post",
-		JunctionTable: "post_tag",
-		TargetTable:   "tag",
-		BaseToJunction: struct {
-			BaseKey     string
-			JunctionKey string
-		}{
-			BaseKey:     "id",
-			JunctionKey: "post_id",
-		},
-		JunctionToTarget: struct {
-			JunctionKey string
-			TargetKey   string
-		}{
-			JunctionKey: "tag_id",
-			TargetKey:   "id",
-		},
-		JoinType: ast.LeftOuterJoin,
-	}, func(s *types.State, expr *ast.Expr) {
+	return func(s *types.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
+		
+		// Find available aliases for junction and target tables
+		junctionAlias := query.FindTableAlias(s, "post_tag")
+		s.Tables[junctionAlias] = struct{}{}
+		
+		targetAlias := query.FindTableAlias(s, "tag")
+		s.Tables[targetAlias] = struct{}{}
+		
+		// Create and apply JOIN
+		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
+			Source:        sl.From.Source,
+			BaseTable:     "post",
+			JunctionTable: "post_tag",
+			JunctionAlias: junctionAlias,
+			TargetTable:   "tag",
+			TargetAlias:   targetAlias,
+			BaseToJunction: struct {
+				BaseKey     string
+				JunctionKey string
+			}{
+				BaseKey:     "id",
+				JunctionKey: "post_id",
+			},
+			JunctionToTarget: struct {
+				JunctionKey string
+				TargetKey   string
+			}{
+				JunctionKey: "tag_id",
+				TargetKey:   "id",
+			},
+			JoinType: ast.LeftOuterJoin,
+		})
+		
+		// Apply WHERE condition if provided
 		if whereOpt != nil {
-			whereOpt(s, expr)
+			previousAlias := s.WorkingTableAlias
+			s.WorkingTableAlias = targetAlias
+			
+			var expr ast.Expr
+			whereOpt(s, &expr)
+			
+			if expr != nil {
+				if sl.Where == nil {
+					sl.Where = &ast.Where{}
+				}
+				
+				if sl.Where.Expr != nil {
+					sl.Where.Expr = &ast.ParenExpr{
+						Expr: &ast.BinaryExpr{
+							Op:    ast.OpAnd,
+							Left:  sl.Where.Expr,
+							Right: expr,
+						},
+					}
+				} else {
+					sl.Where.Expr = expr
+				}
+			}
+			
+			s.WorkingTableAlias = previousAlias
 		}
-	}))
+	}
 }

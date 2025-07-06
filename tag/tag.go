@@ -74,28 +74,68 @@ func Or(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 
 // Posts joins with post table through post_tag junction table (many-to-many relationship)
 func Posts(whereOpt types.ExprOption[tables.Post]) types.QueryOption[tables.Tag] {
-	return types.QueryOption[tables.Tag](query.JoinThrough(query.JoinThroughConfig{
-		BaseTable:     "tag",
-		JunctionTable: "post_tag",
-		TargetTable:   "post",
-		BaseToJunction: struct {
-			BaseKey     string
-			JunctionKey string
-		}{
-			BaseKey:     "id",
-			JunctionKey: "tag_id",
-		},
-		JunctionToTarget: struct {
-			JunctionKey string
-			TargetKey   string
-		}{
-			JunctionKey: "post_id",
-			TargetKey:   "id",
-		},
-		JoinType: ast.LeftOuterJoin,
-	}, func(s *types.State, expr *ast.Expr) {
+	return func(s *types.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
+		
+		// Find available aliases for junction and target tables
+		junctionAlias := query.FindTableAlias(s, "post_tag")
+		s.Tables[junctionAlias] = struct{}{}
+		
+		targetAlias := query.FindTableAlias(s, "post")
+		s.Tables[targetAlias] = struct{}{}
+		
+		// Create and apply JOIN
+		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
+			Source:        sl.From.Source,
+			BaseTable:     "tag",
+			JunctionTable: "post_tag",
+			JunctionAlias: junctionAlias,
+			TargetTable:   "post",
+			TargetAlias:   targetAlias,
+			BaseToJunction: struct {
+				BaseKey     string
+				JunctionKey string
+			}{
+				BaseKey:     "id",
+				JunctionKey: "tag_id",
+			},
+			JunctionToTarget: struct {
+				JunctionKey string
+				TargetKey   string
+			}{
+				JunctionKey: "post_id",
+				TargetKey:   "id",
+			},
+			JoinType: ast.LeftOuterJoin,
+		})
+		
+		// Apply WHERE condition if provided
 		if whereOpt != nil {
-			whereOpt(s, expr)
+			previousAlias := s.WorkingTableAlias
+			s.WorkingTableAlias = targetAlias
+			
+			var expr ast.Expr
+			whereOpt(s, &expr)
+			
+			if expr != nil {
+				if sl.Where == nil {
+					sl.Where = &ast.Where{}
+				}
+				
+				if sl.Where.Expr != nil {
+					sl.Where.Expr = &ast.ParenExpr{
+						Expr: &ast.BinaryExpr{
+							Op:    ast.OpAnd,
+							Left:  sl.Where.Expr,
+							Right: expr,
+						},
+					}
+				} else {
+					sl.Where.Expr = expr
+				}
+			}
+			
+			s.WorkingTableAlias = previousAlias
 		}
-	}))
+	}
 }

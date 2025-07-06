@@ -8,34 +8,6 @@ import (
 	"github.com/rail44/plate/types"
 )
 
-func JoinProfile(whereOpt types.ExprOption[tables.Profile]) types.QueryOption[tables.User] {
-	return types.QueryOption[tables.User](query.Join(query.JoinConfig{
-		BaseTable:   "user",
-		TargetTable: "profile",
-		BaseKey:     "id",
-		TargetKey:   "user_id",
-		JoinType:    ast.InnerJoin,
-	}, func(s *types.State, expr *ast.Expr) {
-		if whereOpt != nil {
-			whereOpt(s, expr)
-		}
-	}))
-}
-
-func LeftJoinProfile(whereOpt types.ExprOption[tables.Profile]) types.QueryOption[tables.User] {
-	return types.QueryOption[tables.User](query.Join(query.JoinConfig{
-		BaseTable:   "user",
-		TargetTable: "profile",
-		BaseKey:     "id",
-		TargetKey:   "user_id",
-		JoinType:    ast.LeftOuterJoin,
-	}, func(s *types.State, expr *ast.Expr) {
-		if whereOpt != nil {
-			whereOpt(s, expr)
-		}
-	}))
-}
-
 func ID(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
@@ -142,16 +114,52 @@ func Paren(inner types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 
 // Posts joins with post table (has_many relationship)
 func Posts(whereOpt types.ExprOption[tables.Post]) types.QueryOption[tables.User] {
-	return types.QueryOption[tables.User](query.Join(query.JoinConfig{
-		BaseTable:   "user",
-		TargetTable: "post",
-		BaseKey:     "id",
-		TargetKey:   "user_id",
-		JoinType:    ast.LeftOuterJoin,
-	}, func(s *types.State, expr *ast.Expr) {
+	return func(s *types.State, q *ast.Query) {
+		sl := q.Query.(*ast.Select)
+		
+		// Find available alias for target table
+		tableName := query.FindTableAlias(s, "post")
+		s.Tables[tableName] = struct{}{}
+		
+		// Create and apply JOIN
+		sl.From.Source = query.Join(query.JoinConfig{
+			Source:      sl.From.Source,
+			BaseTable:   "user",
+			TargetTable: "post",
+			TargetAlias: tableName,
+			BaseKey:     "id",
+			TargetKey:   "user_id",
+			JoinType:    ast.LeftOuterJoin,
+		})
+		
+		// Apply WHERE condition if provided
 		if whereOpt != nil {
-			whereOpt(s, expr)
+			previousAlias := s.WorkingTableAlias
+			s.WorkingTableAlias = tableName
+			
+			var expr ast.Expr
+			whereOpt(s, &expr)
+			
+			if expr != nil {
+				if sl.Where == nil {
+					sl.Where = &ast.Where{}
+				}
+				
+				if sl.Where.Expr != nil {
+					sl.Where.Expr = &ast.ParenExpr{
+						Expr: &ast.BinaryExpr{
+							Op:    ast.OpAnd,
+							Left:  sl.Where.Expr,
+							Right: expr,
+						},
+					}
+				} else {
+					sl.Where.Expr = expr
+				}
+			}
+			
+			s.WorkingTableAlias = previousAlias
 		}
-	}))
+	}
 }
 
