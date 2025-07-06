@@ -4,8 +4,8 @@ package post
 
 import (
 	"github.com/cloudspannerecosystem/memefish/ast"
+	"github.com/rail44/plate/examples/generated/tables"
 	"github.com/rail44/plate/query"
-	"github.com/rail44/plate/tables"
 	"github.com/rail44/plate/types"
 	"time"
 )

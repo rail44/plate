@@ -2,16 +2,16 @@ package plate
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
+	
+	"golang.org/x/tools/go/packages"
 )
 
 // GeneratorConfig holds the configuration for generating query builders
 type GeneratorConfig struct {
 	Tables    []TableConfig
 	Junctions []JunctionConfig
-	// TablesImportPath specifies the import path for the generated tables package
-	// If empty, defaults to github.com/rail44/plate/tables
-	TablesImportPath string
 }
 
 // TableConfig represents a table that needs a query builder
@@ -50,6 +50,7 @@ type KeyPair struct {
 // Generator is responsible for generating query builder code
 type Generator struct {
 	config GeneratorConfig
+	outputDir string
 }
 
 // NewGenerator creates a new Generator instance
@@ -58,8 +59,9 @@ func NewGenerator() *Generator {
 }
 
 // Generate generates query builder code based on the provided configuration
-func (g *Generator) Generate(config GeneratorConfig) (GeneratedFiles, error) {
+func (g *Generator) Generate(config GeneratorConfig, outputDir string) (GeneratedFiles, error) {
 	g.config = config
+	g.outputDir = outputDir
 
 	// Validate configuration
 	if err := g.validateConfig(); err != nil {
@@ -324,12 +326,33 @@ func (g *Generator) getBaseImportPath() string {
 
 // getTablesImportPath returns the import path for the generated tables package
 func (g *Generator) getTablesImportPath() string {
-	if g.config.TablesImportPath != "" {
-		return g.config.TablesImportPath
+	// Use packages.Load to get package information
+	cfg := &packages.Config{
+		Mode: packages.NeedName | packages.NeedModule,
+		Dir:  g.outputDir,
 	}
 	
-	// Default to plate's own tables package
-	return g.getBaseImportPath() + "/tables"
+	pkgs, err := packages.Load(cfg, ".")
+	if err != nil || len(pkgs) == 0 || pkgs[0].Module == nil {
+		// Fallback to default if package information not found
+		return g.getBaseImportPath() + "/tables"
+	}
+	
+	pkg := pkgs[0]
+	module := pkg.Module
+	
+	// Calculate import path based on module and directory
+	absOutputDir, _ := filepath.Abs(g.outputDir)
+	relPath, err := filepath.Rel(module.Dir, absOutputDir)
+	if err != nil {
+		return g.getBaseImportPath() + "/tables"
+	}
+	
+	// Build import path
+	if relPath == "." {
+		return module.Path + "/tables"
+	}
+	return module.Path + "/" + filepath.ToSlash(relPath) + "/tables"
 }
 
 // lastIndex finds the last occurrence of substr in s
