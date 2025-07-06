@@ -14,3 +14,13 @@ func (Profile) TableName() string { return "profile" }
 type Post struct{}
 
 func (Post) TableName() string { return "post" }
+
+// Tag represents the tag table
+type Tag struct{}
+
+func (Tag) TableName() string { return "tag" }
+
+// PostTag represents the post_tag junction table
+type PostTag struct{}
+
+func (PostTag) TableName() string { return "post_tag" }

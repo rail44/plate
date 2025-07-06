@@ -8,6 +8,7 @@ import (
 	"github.com/rail44/plate/profile"
 	"github.com/rail44/plate/query"
 	"github.com/rail44/plate/tables"
+	"github.com/rail44/plate/tag"
 	"github.com/rail44/plate/user"
 )
 
@@ -122,4 +123,42 @@ func main() {
 		post.Limit(10),
 	)
 	fmt.Printf("Announcement posts from company authors: %s (params: %v)\n", sql14, params14)
+
+	// 多対多の関係のJOIN例
+	fmt.Println("\n--- Many-to-Many JOIN Examples ---")
+	
+	// 特定のタグを持つ投稿を取得
+	sql15, params15 := query.Select[tables.Post](
+		post.Tags(tag.Name(ast.OpEqual, "Go")),
+		post.Title(ast.OpLike, "%tutorial%"),
+		post.OrderBy("created_at", ast.DirectionDesc),
+	)
+	fmt.Printf("Posts tagged with 'Go': %s (params: %v)\n", sql15, params15)
+	
+	// 複数のタグ条件
+	sql16, params16 := query.Select[tables.Post](
+		post.Tags(tag.Or(
+			tag.Name(ast.OpEqual, "Go"),
+			tag.Name(ast.OpEqual, "Tutorial"),
+		)),
+		post.Author(user.Name(ast.OpNotEqual, "Admin")),
+		post.Limit(20),
+	)
+	fmt.Printf("Posts tagged with 'Go' or 'Tutorial': %s (params: %v)\n", sql16, params16)
+	
+	// タグから関連する投稿を検索
+	sql17, params17 := query.Select[tables.Tag](
+		tag.Posts(post.Title(ast.OpLike, "%announcement%")),
+		tag.Name(ast.OpLike, "tech%"),
+		tag.OrderBy("name", ast.DirectionAsc),
+	)
+	fmt.Printf("Tech tags used in announcements: %s (params: %v)\n", sql17, params17)
+	
+	// タグがない投稿も含めて取得
+	sql18, params18 := query.Select[tables.Post](
+		post.Tags(nil),
+		post.Author(user.Email(ast.OpLike, "%@example.com")),
+		post.OrderBy("title", ast.DirectionAsc),
+	)
+	fmt.Printf("All posts with their tags (including posts without tags): %s (params: %v)\n", sql18, params18)
 }

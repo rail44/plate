@@ -193,6 +193,47 @@ type JoinConfig struct {
 	JoinType    ast.JoinOp  // JOIN type (INNER, LEFT OUTER, etc.)
 }
 
+// JoinThroughConfig contains configuration for building many-to-many JOIN through a junction table
+type JoinThroughConfig struct {
+	BaseTable       string
+	JunctionTable   string
+	TargetTable     string
+	BaseToJunction  struct {
+		BaseKey     string
+		JunctionKey string
+	}
+	JunctionToTarget struct {
+		JunctionKey string
+		TargetKey   string
+	}
+	JoinType ast.JoinOp
+}
+
+// BuildJoinThrough creates a many-to-many JOIN operation through a junction table
+func BuildJoinThrough(config JoinThroughConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
+	return func(s *types.State, q *ast.Query) {
+		// First apply junction table join
+		junctionJoin := BuildJoin(JoinConfig{
+			BaseTable:   config.BaseTable,
+			TargetTable: config.JunctionTable,
+			BaseKey:     config.BaseToJunction.BaseKey,
+			TargetKey:   config.BaseToJunction.JunctionKey,
+			JoinType:    config.JoinType,
+		}, nil)
+		junctionJoin(s, q)
+
+		// Then apply target table join
+		targetJoin := BuildJoin(JoinConfig{
+			BaseTable:   config.JunctionTable,
+			TargetTable: config.TargetTable,
+			BaseKey:     config.JunctionToTarget.JunctionKey,
+			TargetKey:   config.JunctionToTarget.TargetKey,
+			JoinType:    config.JoinType,
+		}, whereOpt)
+		targetJoin(s, q)
+	}
+}
+
 // BuildJoin creates a JOIN operation with the given configuration
 func BuildJoin(config JoinConfig, whereOpt func(*types.State, *ast.Expr)) func(*types.State, *ast.Query) {
 	return func(s *types.State, q *ast.Query) {

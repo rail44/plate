@@ -103,3 +103,31 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {
 		q.OrderBy.Items = append(q.OrderBy.Items, query.BuildOrderByItem("post", column, dir))
 	}
 }
+
+// Tags joins with tag table through post_tag junction table (many-to-many relationship)
+func Tags(whereOpt types.ExprOption[tables.Tag]) types.QueryOption[tables.Post] {
+	return types.QueryOption[tables.Post](query.BuildJoinThrough(query.JoinThroughConfig{
+		BaseTable:     "post",
+		JunctionTable: "post_tag",
+		TargetTable:   "tag",
+		BaseToJunction: struct {
+			BaseKey     string
+			JunctionKey string
+		}{
+			BaseKey:     "id",
+			JunctionKey: "post_id",
+		},
+		JunctionToTarget: struct {
+			JunctionKey string
+			TargetKey   string
+		}{
+			JunctionKey: "tag_id",
+			TargetKey:   "id",
+		},
+		JoinType: ast.LeftOuterJoin,
+	}, func(s *types.State, expr *ast.Expr) {
+		if whereOpt != nil {
+			whereOpt(s, expr)
+		}
+	}))
+}
