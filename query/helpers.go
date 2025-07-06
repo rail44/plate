@@ -190,6 +190,38 @@ func FindTableAlias(s *types.State, baseTableName string) string {
 	return tableName
 }
 
+// FindSemanticAlias finds an available alias based on the relationship context
+func FindSemanticAlias(s *types.State, tableName, relationshipName string) string {
+	// Use relationship name as the base alias
+	baseAlias := relationshipName
+	if baseAlias == "" {
+		baseAlias = tableName
+	}
+	
+	// Check if the base alias is available
+	if _, exists := s.Tables[baseAlias]; !exists {
+		return baseAlias
+	}
+	
+	// If not, try with context prefix
+	if s.WorkingTableAlias != "" && s.WorkingTableAlias != tableName {
+		contextAlias := fmt.Sprintf("%s_%s", s.WorkingTableAlias, baseAlias)
+		if _, exists := s.Tables[contextAlias]; !exists {
+			return contextAlias
+		}
+	}
+	
+	// Fall back to numbered suffix
+	counter := 1
+	for {
+		numberedAlias := fmt.Sprintf("%s%d", baseAlias, counter)
+		if _, exists := s.Tables[numberedAlias]; !exists {
+			return numberedAlias
+		}
+		counter++
+	}
+}
+
 // Join creates a JOIN AST node
 func Join(config JoinConfig) *ast.Join {
 	return &ast.Join{
@@ -197,7 +229,12 @@ func Join(config JoinConfig) *ast.Join {
 		Op:   config.JoinType,
 		Right: &ast.TableName{
 			Table: &ast.Ident{
-				Name: config.TargetAlias,
+				Name: config.TargetTable,
+			},
+			As: &ast.AsAlias{
+				Alias: &ast.Ident{
+					Name: config.TargetAlias,
+				},
 			},
 		},
 		Cond: &ast.On{

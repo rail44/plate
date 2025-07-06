@@ -35,7 +35,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Tag] {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{}
 		}
-		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem("tag", column, dir))
+		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.WorkingTableAlias, column, dir))
 	}
 }
 
@@ -68,16 +68,16 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
 		sl := q.Query.(*ast.Select)
 		
 		// Find available aliases for junction and target tables
-		junctionAlias := query.FindTableAlias(s, "post_tag")
+		junctionAlias := query.FindSemanticAlias(s, "post_tag", "tag_posts_junction")
 		s.Tables[junctionAlias] = struct{}{}
 		
-		targetAlias := query.FindTableAlias(s, "post")
+		targetAlias := query.FindSemanticAlias(s, "post", "posts")
 		s.Tables[targetAlias] = struct{}{}
 		
 		// Create and apply JOIN
 		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
 			Source:        sl.From.Source,
-			BaseTable:     "tag",
+			BaseTable:     s.WorkingTableAlias,
 			JunctionTable: "post_tag",
 			JunctionAlias: junctionAlias,
 			TargetTable:   "post",

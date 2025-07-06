@@ -114,7 +114,7 @@ func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 		// Create and apply JOIN
 		sl.From.Source = query.Join(query.JoinConfig{
 			Source:      sl.From.Source,
-			BaseTable:   "user",
+			BaseTable:   s.WorkingTableAlias,
 			TargetTable: "post",
 			TargetAlias: tableName,
 			BaseKey:     "id",

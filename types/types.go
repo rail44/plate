@@ -38,3 +38,13 @@ type QueryOption[T Table] func(*State, *ast.Query)
 func (opt QueryOption[T]) Apply(s *State, q *ast.Query) {
 	opt(s, q)
 }
+
+// AliasOption represents an alias specification for a JOIN operation
+type AliasOption struct {
+	Alias string
+}
+
+// As creates an AliasOption to specify a custom alias for a JOIN
+func As(alias string) AliasOption {
+	return AliasOption{Alias: alias}
+}

@@ -13,14 +13,14 @@ func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
-		// Find available alias for target table
-		tableName := query.FindTableAlias(s, "user")
+		// Find available alias for target table using semantic naming
+		tableName := query.FindSemanticAlias(s, "user", "author")
 		s.Tables[tableName] = struct{}{}
 		
 		// Create and apply JOIN
 		sl.From.Source = query.Join(query.JoinConfig{
 			Source:      sl.From.Source,
-			BaseTable:   "post",
+			BaseTable:   s.WorkingTableAlias,
 			TargetTable: "user",
 			TargetAlias: tableName,
 			BaseKey:     "user_id",
@@ -107,7 +107,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{}
 		}
-		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem("post", column, dir))
+		q.OrderBy.Items = append(q.OrderBy.Items, query.OrderByItem(s.WorkingTableAlias, column, dir))
 	}
 }
 
@@ -117,16 +117,16 @@ func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 		sl := q.Query.(*ast.Select)
 		
 		// Find available aliases for junction and target tables
-		junctionAlias := query.FindTableAlias(s, "post_tag")
+		junctionAlias := query.FindSemanticAlias(s, "post_tag", "post_tags_junction")
 		s.Tables[junctionAlias] = struct{}{}
 		
-		targetAlias := query.FindTableAlias(s, "tag")
+		targetAlias := query.FindSemanticAlias(s, "tag", "tags")
 		s.Tables[targetAlias] = struct{}{}
 		
 		// Create and apply JOIN
 		sl.From.Source = query.JoinThrough(query.JoinThroughConfig{
 			Source:        sl.From.Source,
-			BaseTable:     "post",
+			BaseTable:     s.WorkingTableAlias,
 			JunctionTable: "post_tag",
 			JunctionAlias: junctionAlias,
 			TargetTable:   "tag",
