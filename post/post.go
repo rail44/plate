@@ -9,7 +9,7 @@ import (
 
 // Author joins with user table (belongs_to relationship)
 func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
-	return query.DirectJoin[tables.Post, tables.User](
+	return query.DirectJoin[tables.Post](
 		"author",
 		"user",
 		query.KeyPair{From: "user_id", To: "id"},
@@ -70,7 +70,7 @@ func WithInnerJoin() types.QueryOption[tables.Post] {
 
 // Tags joins with tag table through post_tag junction table (many-to-many relationship)
 func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
-	return query.JunctionJoin[tables.Post, tables.Tag](
+	return query.JunctionJoin[tables.Post](
 		"tags",
 		"post_tag",
 		query.KeyPair{From: "id", To: "post_id"},

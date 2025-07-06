@@ -55,7 +55,7 @@ func WithInnerJoin() types.QueryOption[tables.User] {
 
 // Posts joins with post table (has_many relationship)
 func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
-	return query.DirectJoin[tables.User, tables.Post](
+	return query.DirectJoin[tables.User](
 		"posts",
 		"post",
 		query.KeyPair{From: "id", To: "user_id"},

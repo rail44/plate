@@ -51,7 +51,7 @@ func Not(opt types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 
 // Posts joins with post table through post_tag junction table (many-to-many relationship)
 func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
-	return query.JunctionJoin[tables.Tag, tables.Post](
+	return query.JunctionJoin[tables.Tag](
 		"posts",
 		"post_tag",
 		query.KeyPair{From: "id", To: "tag_id"},
