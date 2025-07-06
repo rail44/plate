@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"strings"
 	"github.com/cloudspannerecosystem/memefish/ast"
 )
@@ -108,4 +109,69 @@ type QueryOption[T Table] func(*State, *ast.Query)
 // Apply implements the Option interface for QueryOption
 func (opt QueryOption[T]) Apply(s *State, q *ast.Query) {
 	opt(s, q)
+}
+
+// Column represents a table column that can be used in various SQL contexts
+type Column[T Table] struct {
+	Name string
+}
+
+// Op creates a condition using the specified operator and value
+func (c Column[T]) Op(op ast.BinaryOp, value any) ExprOption[T] {
+	return func(s *State, expr *ast.Expr) {
+		i := len(s.Params)
+		s.Params = append(s.Params, value)
+		*expr = &ast.BinaryExpr{
+			Left: &ast.Path{
+				Idents: []*ast.Ident{
+					{Name: s.CurrentAlias()},
+					{Name: c.Name},
+				},
+			},
+			Op: op,
+			Right: &ast.Param{
+				Name: fmt.Sprintf("p%d", i),
+			},
+		}
+	}
+}
+
+// Eq creates an equality condition (=)
+func (c Column[T]) Eq(value any) ExprOption[T] {
+	return c.Op(ast.OpEqual, value)
+}
+
+// Ne creates a not equal condition (!=)
+func (c Column[T]) Ne(value any) ExprOption[T] {
+	return c.Op(ast.OpNotEqual, value)
+}
+
+// Lt creates a less than condition (<)
+func (c Column[T]) Lt(value any) ExprOption[T] {
+	return c.Op(ast.OpLess, value)
+}
+
+// Gt creates a greater than condition (>)
+func (c Column[T]) Gt(value any) ExprOption[T] {
+	return c.Op(ast.OpGreater, value)
+}
+
+// Le creates a less than or equal condition (<=)
+func (c Column[T]) Le(value any) ExprOption[T] {
+	return c.Op(ast.OpLessEqual, value)
+}
+
+// Ge creates a greater than or equal condition (>=)
+func (c Column[T]) Ge(value any) ExprOption[T] {
+	return c.Op(ast.OpGreaterEqual, value)
+}
+
+// Like creates a LIKE condition
+func (c Column[T]) Like(value string) ExprOption[T] {
+	return c.Op(ast.OpLike, value)
+}
+
+// NotLike creates a NOT LIKE condition
+func (c Column[T]) NotLike(value string) ExprOption[T] {
+	return c.Op(ast.OpNotLike, value)
 }

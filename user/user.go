@@ -8,7 +8,21 @@ import (
 	"github.com/rail44/plate/types"
 )
 
-func ID(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
+// Column accessors for type-safe column references
+func ID() types.Column[tables.User] {
+	return types.Column[tables.User]{Name: "id"}
+}
+
+func Name() types.Column[tables.User] {
+	return types.Column[tables.User]{Name: "name"}
+}
+
+func Email() types.Column[tables.User] {
+	return types.Column[tables.User]{Name: "email"}
+}
+
+// Legacy functions for backward compatibility
+func IDLegacy(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	return func(s *types.State, expr *ast.Expr) {
 		i := len(s.Params)
 		s.Params = append(s.Params, value)
@@ -16,21 +30,6 @@ func ID(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
 	}
 }
 
-func Name(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "name", op, fmt.Sprintf("p%d", i))
-	}
-}
-
-func Email(op ast.BinaryOp, value string) types.ExprOption[tables.User] {
-	return func(s *types.State, expr *ast.Expr) {
-		i := len(s.Params)
-		s.Params = append(s.Params, value)
-		*expr = query.ColumnExpr(s.CurrentAlias(), "email", op, fmt.Sprintf("p%d", i))
-	}
-}
 
 func Limit(count int) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
@@ -38,7 +37,7 @@ func Limit(count int) types.QueryOption[tables.User] {
 	}
 }
 
-func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.User] {
+func OrderBy(column types.Column[tables.User], dir ast.Direction) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {
 		if q.OrderBy == nil {
 			q.OrderBy = &ast.OrderBy{
@@ -46,7 +45,7 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.User] {
 			}
 		}
 		q.OrderBy.Items = append(q.OrderBy.Items,
-			query.OrderByItem(s.CurrentAlias(), column, dir))
+			query.OrderByItem(s.CurrentAlias(), column.Name, dir))
 	}
 }
 
