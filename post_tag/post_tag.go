@@ -28,6 +28,11 @@ func OrderBy[V any](column types.Column[tables.PostTag, V], dir ast.Direction) t
 	return query.OrderBy(column, dir)
 }
 
+// Select creates a SELECT query for the PostTag table
+func Select(opts ...types.Option[tables.PostTag]) (string, []any) {
+	return query.Select(opts...)
+}
+
 // WithInnerJoin changes the JOIN type to INNER JOIN
 func WithInnerJoin() types.QueryOption[tables.PostTag] {
 	return query.WithInnerJoinOption[tables.PostTag]()

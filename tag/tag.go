@@ -24,6 +24,11 @@ func OrderBy[V any](column types.Column[tables.Tag, V], dir ast.Direction) types
 	return query.OrderBy(column, dir)
 }
 
+// Select creates a SELECT query for the Tag table
+func Select(opts ...types.Option[tables.Tag]) (string, []any) {
+	return query.Select(opts...)
+}
+
 // WithInnerJoin changes the JOIN type to INNER JOIN
 func WithInnerJoin() types.QueryOption[tables.Tag] {
 	return query.WithInnerJoinOption[tables.Tag]()

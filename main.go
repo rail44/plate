@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/rail44/plate/post"
-	"github.com/rail44/plate/query"
-	"github.com/rail44/plate/tables"
 	"github.com/rail44/plate/tag"
 	"github.com/rail44/plate/user"
 )
@@ -27,7 +25,7 @@ func main() {
 
 	// Example: Find a specific user with pagination
 	// Use case: User search, profile lookup
-	sql1, params1 := query.Select[tables.User](
+	sql1, params1 := user.Select(
 		user.Name().Eq("John"),
 		user.Limit(10),
 	)
@@ -35,7 +33,7 @@ func main() {
 
 	// Example: Find users by multiple names with additional filters
 	// Use case: Bulk user lookup, team member search
-	sql2, params2 := query.Select[tables.User](
+	sql2, params2 := user.Select(
 		user.Or(
 			user.Name().Eq("John"),
 			user.Name().Eq("Jane"),
@@ -48,7 +46,7 @@ func main() {
 
 	// Example: Find admin users from a specific company
 	// Use case: Permission checks, admin user identification
-	sql3, params3 := query.Select[tables.User](
+	sql3, params3 := user.Select(
 		user.Email().Like("%@company.com"),
 		user.Or(
 			user.Name().Eq("Admin"),
@@ -62,7 +60,7 @@ func main() {
 
 	// Example: Get all users with their posts (including users without posts)
 	// Use case: User dashboard, activity overview
-	sql4, params4 := query.Select[tables.User](
+	sql4, params4 := user.Select(
 		user.Posts(),
 		user.OrderBy(user.Name(), ast.DirectionAsc),
 	)
@@ -70,7 +68,7 @@ func main() {
 
 	// Example: Find non-admin users who have important posts
 	// Use case: Content moderation, important content tracking
-	sql5, params5 := query.Select[tables.User](
+	sql5, params5 := user.Select(
 		user.Posts(post.Content().Like("%important%")),
 		user.Name().Ne("Admin"),
 		user.OrderBy(user.Name(), ast.DirectionAsc),
@@ -79,7 +77,7 @@ func main() {
 
 	// Example: Find company announcements with author information
 	// Use case: Company news feed, official announcements
-	sql6, params6 := query.Select[tables.Post](
+	sql6, params6 := post.Select(
 		post.Author(user.Email().Like("%@company.com")),
 		post.Title().Like("Announcement:%"),
 		post.OrderBy(post.Title(), ast.DirectionDesc),
@@ -91,7 +89,7 @@ func main() {
 
 	// Example: Find Go tutorials
 	// Use case: Tag-based content filtering, topic search
-	sql7, params7 := query.Select[tables.Post](
+	sql7, params7 := post.Select(
 		post.Tags(tag.Name().Eq("Go")),
 		post.Title().Like("%tutorial%"),
 		// TODO: OrderBy temporarily disabled until CreatedAt column is added
@@ -100,7 +98,7 @@ func main() {
 
 	// Example: Find user-generated content with specific tags
 	// Use case: Community content, excluding official posts
-	sql8, params8 := query.Select[tables.Post](
+	sql8, params8 := post.Select(
 		post.Tags(tag.Or(
 			tag.Name().Eq("Go"),
 			tag.Name().Eq("Tutorial"),
@@ -112,7 +110,7 @@ func main() {
 
 	// Example: Find tech tags used in announcements
 	// Use case: Tag analytics, content categorization
-	sql9, params9 := query.Select[tables.Tag](
+	sql9, params9 := tag.Select(
 		tag.Posts(post.Title().Like("%announcement%")),
 		tag.Name().Like("tech%"),
 		tag.OrderBy(tag.Name(), ast.DirectionAsc),
@@ -123,7 +121,7 @@ func main() {
 
 	// Example: Complete user profile with all posts and tags
 	// Use case: User profile page, export user data
-	sql10, params10 := query.Select[tables.User](
+	sql10, params10 := user.Select(
 		user.Email().Eq("john@example.com"),
 		user.Posts(
 			post.Tags(),
@@ -134,7 +132,7 @@ func main() {
 
 	// Example: Find tutorial authors for a specific technology
 	// Use case: Expert identification, content contributor search
-	sql11, params11 := query.Select[tables.User](
+	sql11, params11 := user.Select(
 		user.Posts(
 			post.Tags(
 				tag.Name().Eq("Go"),
@@ -147,7 +145,7 @@ func main() {
 
 	// Example: Analyze tag usage in company communications
 	// Use case: Content strategy, tag effectiveness analysis
-	sql12, params12 := query.Select[tables.Tag](
+	sql12, params12 := tag.Select(
 		tag.Name().Like("tech%"),
 		tag.Posts(
 			post.Author(
@@ -159,7 +157,7 @@ func main() {
 	)
 	printExample("Tag → Posts → User (reverse navigation)", sql12, params12)
 
-	sql13, params13 := query.Select[tables.Post](
+	sql13, params13 := post.Select(
 		post.Or(
 			post.ID().Eq("12345"),
 			post.Title().Like("%example%"),
@@ -172,7 +170,7 @@ func main() {
 	printExample("Multiple OR conditions", sql13, params13)
 
 	// Example: Complex boolean expression (a AND b) OR (c AND d)
-	sql14, params14 := query.Select[tables.User](
+	sql14, params14 := user.Select(
 		user.Or(
 			user.And(
 				user.Name().Eq("John"),
@@ -187,7 +185,7 @@ func main() {
 	printExample("Complex boolean expression: (a AND b) OR (c AND d)", sql14, params14)
 
 	// Example: Using WithInnerJoin to get only users with posts
-	sql15, params15 := query.Select[tables.User](
+	sql15, params15 := user.Select(
 		user.Posts(
 			post.Title().Like("%important%"),
 			post.WithInnerJoin(),
@@ -197,7 +195,7 @@ func main() {
 	printExample("Users with posts (INNER JOIN)", sql15, params15)
 
 	// Example: Demonstrating new Column API
-	sql16, params16 := query.Select[tables.User](
+	sql16, params16 := user.Select(
 		user.Name().Like("J%"),
 		user.Email().Ne("admin@example.com"),
 		user.ID().Gt("10"),
@@ -208,14 +206,14 @@ func main() {
 	printSection("Type-Safe Column API Examples")
 
 	// Example: Using Between for range queries (compile-time type safe)
-	sql17, params17 := query.Select[tables.User](
+	sql17, params17 := user.Select(
 		user.ID().Between("100", "200"),
 		user.OrderBy(user.ID(), ast.DirectionAsc),
 	)
 	printExample("BETWEEN with type safety", sql17, params17)
 
 	// Example: Using IN for multiple values
-	sql18, params18 := query.Select[tables.User](
+	sql18, params18 := user.Select(
 		user.Name().In("John", "Jane", "Bob"),
 		user.Email().IsNotNull(),
 		user.OrderBy(user.Name(), ast.DirectionAsc),
@@ -223,7 +221,7 @@ func main() {
 	printExample("IN condition with type safety", sql18, params18)
 
 	// Example: NULL checking
-	sql19, params19 := query.Select[tables.Post](
+	sql19, params19 := post.Select(
 		post.Content().IsNotNull(),
 		post.Title().Like("%important%"),
 		post.OrderBy(post.Title(), ast.DirectionDesc),
@@ -231,7 +229,7 @@ func main() {
 	printExample("NULL checking with type safety", sql19, params19)
 
 	// Example: String-specific methods (Like only works with string columns)
-	sql20, params20 := query.Select[tables.Post](
+	sql20, params20 := post.Select(
 		post.Title().Like("Tutorial:%"),
 		post.Content().NotLike("%deprecated%"),
 		post.OrderBy(post.Title(), ast.DirectionAsc),
@@ -241,14 +239,14 @@ func main() {
 	printSection("NOT Function Examples")
 
 	// Example: Simple negation
-	sql21, params21 := query.Select[tables.User](
+	sql21, params21 := user.Select(
 		user.Not(user.Name().Eq("Admin")),
 		user.OrderBy(user.Name(), ast.DirectionAsc),
 	)
 	printExample("Simple NOT condition", sql21, params21)
 
 	// Example: Complex AND negation - NOT (name = 'Admin' AND email LIKE '%@company.com')
-	sql22, params22 := query.Select[tables.User](
+	sql22, params22 := user.Select(
 		user.Not(user.And(
 			user.Name().Eq("Admin"),
 			user.Email().Like("%@company.com"),
@@ -258,7 +256,7 @@ func main() {
 	printExample("NOT with complex AND condition", sql22, params22)
 
 	// Example: OR negation - NOT (name = 'Admin' OR name = 'System')
-	sql23, params23 := query.Select[tables.User](
+	sql23, params23 := user.Select(
 		user.Not(user.Or(
 			user.Name().Eq("Admin"),
 			user.Name().Eq("System"),
@@ -269,7 +267,7 @@ func main() {
 	printExample("NOT with OR condition", sql23, params23)
 
 	// Example: NOT with IN condition
-	sql24, params24 := query.Select[tables.User](
+	sql24, params24 := user.Select(
 		user.Not(user.ID().In("1", "2", "3")),
 		user.Name().Like("J%"),
 		user.OrderBy(user.ID(), ast.DirectionAsc),
@@ -277,7 +275,7 @@ func main() {
 	printExample("NOT with IN condition", sql24, params24)
 
 	// Example: NOT with complex boolean logic - NOT ((a AND b) OR (c AND d))
-	sql25, params25 := query.Select[tables.User](
+	sql25, params25 := user.Select(
 		user.Not(user.Or(
 			user.And(
 				user.Name().Eq("John"),

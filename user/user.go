@@ -28,6 +28,11 @@ func OrderBy[V any](column types.Column[tables.User, V], dir ast.Direction) type
 	return query.OrderBy(column, dir)
 }
 
+// Select creates a SELECT query for the User table
+func Select(opts ...types.Option[tables.User]) (string, []any) {
+	return query.Select(opts...)
+}
+
 // Or creates an OR condition that can be used at the top level
 func Or(opts ...types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 	return query.Or(opts...)

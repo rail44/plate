@@ -132,10 +132,7 @@ func joinThrough(config joinThroughConfig) *ast.Join {
 		BaseTable:   config.BaseTable,
 		TargetTable: config.JunctionTable,
 		TargetAlias: config.JunctionAlias,
-		Keys: KeyPair{
-			From: config.BaseToJunction.From,
-			To:   config.BaseToJunction.To,
-		},
+		Keys: config.BaseToJunction,
 		JoinType: config.JoinType,
 	})
 
@@ -145,19 +142,16 @@ func joinThrough(config joinThroughConfig) *ast.Join {
 		BaseTable:   config.JunctionAlias,
 		TargetTable: config.TargetTable,
 		TargetAlias: config.TargetAlias,
-		Keys: KeyPair{
-			From: config.JunctionToTarget.From,
-			To:   config.JunctionToTarget.To,
-		},
+		Keys: config.JunctionToTarget,
 		JoinType: config.JoinType,
 	})
 }
 
-// FindLastJoin recursively finds the last JOIN in the FROM clause
-func FindLastJoin(source ast.TableExpr) *ast.Join {
+// findLastJoin recursively finds the last JOIN in the FROM clause
+func findLastJoin(source ast.TableExpr) *ast.Join {
 	if join, ok := source.(*ast.Join); ok {
 		// Check if the right side has more joins
-		if rightJoin := FindLastJoin(join.Right); rightJoin != nil {
+		if rightJoin := findLastJoin(join.Right); rightJoin != nil {
 			return rightJoin
 		}
 		return join
@@ -251,7 +245,7 @@ func WithInnerJoinOption[T types.Table]() types.QueryOption[T] {
 	return func(s *types.State, q *ast.Query) {
 		// Find the last JOIN and change its type
 		if sl, ok := q.Query.(*ast.Select); ok {
-			if join := FindLastJoin(sl.From.Source); join != nil {
+			if join := findLastJoin(sl.From.Source); join != nil {
 				join.Op = ast.InnerJoin
 			}
 		}
