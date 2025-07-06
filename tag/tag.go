@@ -24,16 +24,6 @@ func Name(op ast.BinaryOp, value string) types.ExprOption[tables.Tag] {
 	}
 }
 
-func Where(opt types.ExprOption[tables.Tag]) types.QueryOption[tables.Tag] {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-		if sl.Where == nil {
-			sl.Where = &ast.Where{}
-		}
-		opt(s, &sl.Where.Expr)
-	}
-}
-
 func Limit(count int) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
 		q.Limit = query.Limit(count)
@@ -73,7 +63,7 @@ func Or(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 }
 
 // Posts joins with post table through post_tag junction table (many-to-many relationship)
-func Posts(whereOpt types.ExprOption[tables.Post]) types.QueryOption[tables.Tag] {
+func Posts(args ...interface{}) types.QueryOption[tables.Tag] {
 	return func(s *types.State, q *ast.Query) {
 		sl := q.Query.(*ast.Select)
 		
@@ -109,29 +99,19 @@ func Posts(whereOpt types.ExprOption[tables.Post]) types.QueryOption[tables.Tag]
 			JoinType: ast.LeftOuterJoin,
 		})
 		
-		// Apply WHERE condition if provided
-		if whereOpt != nil {
+		// Convert and apply options
+		if len(args) > 0 {
 			previousAlias := s.WorkingTableAlias
 			s.WorkingTableAlias = targetAlias
 			
-			var expr ast.Expr
-			whereOpt(s, &expr)
-			
-			if expr != nil {
-				if sl.Where == nil {
-					sl.Where = &ast.Where{}
-				}
-				
-				if sl.Where.Expr != nil {
-					sl.Where.Expr = &ast.ParenExpr{
-						Expr: &ast.BinaryExpr{
-							Op:    ast.OpAnd,
-							Left:  sl.Where.Expr,
-							Right: expr,
-						},
-					}
-				} else {
-					sl.Where.Expr = expr
+			for _, arg := range args {
+				switch v := arg.(type) {
+				case types.QueryOption[tables.Post]:
+					v(s, q)
+				case types.ExprOption[tables.Post]:
+					query.ConvertToQueryOption(v)(s, q)
+				default:
+					panic(fmt.Sprintf("unsupported option type: %T", v))
 				}
 			}
 			

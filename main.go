@@ -50,7 +50,7 @@ func main() {
 	
 	// 全ユーザーと投稿を取得（投稿がないユーザーも含む）
 	sql12, params12 := query.Select[tables.User](
-		user.Posts(nil),
+		user.Posts(),
 		user.OrderBy("name", ast.DirectionAsc),
 	)
 	fmt.Printf("All users with their posts (including users without posts): %s (params: %v)\n", sql12, params12)
@@ -104,7 +104,7 @@ func main() {
 	
 	// タグがない投稿も含めて取得
 	sql18, params18 := query.Select[tables.Post](
-		post.Tags(nil),
+		post.Tags(),
 		post.Author(user.Email(ast.OpLike, "%@example.com")),
 		post.OrderBy("title", ast.DirectionAsc),
 	)
