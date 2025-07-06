@@ -39,6 +39,18 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Tag] {
 	}
 }
 
+// WithInnerJoin changes the JOIN type to INNER JOIN
+func WithInnerJoin() types.QueryOption[tables.Tag] {
+	return func(s *types.State, q *ast.Query) {
+		// Find the last JOIN and change its type
+		if sl, ok := q.Query.(*ast.Select); ok {
+			if join := query.FindLastJoin(sl.From.Source); join != nil {
+				join.Op = ast.InnerJoin
+			}
+		}
+	}
+}
+
 // And creates an AND condition that groups multiple conditions
 func And(opts ...types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 	return query.And(opts...)

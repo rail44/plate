@@ -66,6 +66,18 @@ func And(opts ...types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 	return query.And(opts...)
 }
 
+// WithInnerJoin changes the JOIN type to INNER JOIN
+func WithInnerJoin() types.QueryOption[tables.User] {
+	return func(s *types.State, q *ast.Query) {
+		// Find the last JOIN and change its type
+		if sl, ok := q.Query.(*ast.Select); ok {
+			if join := query.FindLastJoin(sl.From.Source); join != nil {
+				join.Op = ast.InnerJoin
+			}
+		}
+	}
+}
+
 // Posts joins with post table (has_many relationship)
 func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 	return func(s *types.State, q *ast.Query) {

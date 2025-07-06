@@ -92,6 +92,18 @@ func OrderBy(column string, dir ast.Direction) types.QueryOption[tables.Post] {
 	}
 }
 
+// WithInnerJoin changes the JOIN type to INNER JOIN
+func WithInnerJoin() types.QueryOption[tables.Post] {
+	return func(s *types.State, q *ast.Query) {
+		// Find the last JOIN and change its type
+		if sl, ok := q.Query.(*ast.Select); ok {
+			if join := query.FindLastJoin(sl.From.Source); join != nil {
+				join.Op = ast.InnerJoin
+			}
+		}
+	}
+}
+
 // Tags joins with tag table through post_tag junction table (many-to-many relationship)
 func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
 	return func(s *types.State, q *ast.Query) {

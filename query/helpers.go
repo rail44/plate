@@ -188,6 +188,18 @@ func JoinThrough(config JoinThroughConfig) *ast.Join {
 	})
 }
 
+// FindLastJoin recursively finds the last JOIN in the FROM clause
+func FindLastJoin(source ast.TableExpr) *ast.Join {
+	if join, ok := source.(*ast.Join); ok {
+		// Check if the right side has more joins
+		if rightJoin := FindLastJoin(join.Right); rightJoin != nil {
+			return rightJoin
+		}
+		return join
+	}
+	return nil
+}
+
 // Join creates a JOIN AST node
 func Join(config JoinConfig) *ast.Join {
 	return &ast.Join{

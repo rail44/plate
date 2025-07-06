@@ -185,4 +185,14 @@ func main() {
 		),
 	)
 	printExample("Complex boolean expression: (a AND b) OR (c AND d)", sql14, params14)
+
+	// Example: Using WithInnerJoin to get only users with posts
+	sql15, params15 := query.Select[tables.User](
+		user.Posts(
+			post.Title(ast.OpLike, "%important%"),
+			post.WithInnerJoin(),
+		),
+		user.OrderBy("name", ast.DirectionAsc),
+	)
+	printExample("Users with posts (INNER JOIN)", sql15, params15)
 }
