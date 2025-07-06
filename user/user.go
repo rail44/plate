@@ -14,6 +14,21 @@ func JoinProfile(whereOpt types.ExprOption[tables.Profile]) types.QueryOption[ta
 		TargetTable: "profile",
 		BaseKey:     "id",
 		TargetKey:   "user_id",
+		JoinType:    ast.InnerJoin,
+	}, func(s *types.State, expr *ast.Expr) {
+		if whereOpt != nil {
+			whereOpt(s, expr)
+		}
+	}))
+}
+
+func LeftJoinProfile(whereOpt types.ExprOption[tables.Profile]) types.QueryOption[tables.User] {
+	return types.QueryOption[tables.User](query.BuildJoin(query.JoinConfig{
+		BaseTable:   "user",
+		TargetTable: "profile",
+		BaseKey:     "id",
+		TargetKey:   "user_id",
+		JoinType:    ast.LeftOuterJoin,
 	}, func(s *types.State, expr *ast.Expr) {
 		if whereOpt != nil {
 			whereOpt(s, expr)
@@ -124,3 +139,19 @@ func Paren(inner types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 		*expr = query.BuildParenExpr(innerExpr)
 	}
 }
+
+// Posts joins with post table (has_many relationship)
+func Posts(whereOpt types.ExprOption[tables.Post]) types.QueryOption[tables.User] {
+	return types.QueryOption[tables.User](query.BuildJoin(query.JoinConfig{
+		BaseTable:   "user",
+		TargetTable: "post",
+		BaseKey:     "id",
+		TargetKey:   "user_id",
+		JoinType:    ast.LeftOuterJoin,
+	}, func(s *types.State, expr *ast.Expr) {
+		if whereOpt != nil {
+			whereOpt(s, expr)
+		}
+	}))
+}
+

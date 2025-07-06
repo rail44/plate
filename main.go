@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
 
+	"github.com/rail44/plate/post"
 	"github.com/rail44/plate/profile"
 	"github.com/rail44/plate/query"
 	"github.com/rail44/plate/tables"
@@ -71,4 +72,54 @@ func main() {
 		user.Limit(1),
 	)
 	fmt.Printf("Complex mixed conditions: %s (params: %v)\n", sql8, params8)
+
+	// LEFT OUTER JOINの例
+	fmt.Println("\n--- LEFT OUTER JOIN Examples ---")
+	
+	// User -> Profile LEFT JOIN (プロフィールがないユーザーも含む)
+	sql9, params9 := query.Select[tables.User](
+		user.LeftJoinProfile(nil),
+	)
+	fmt.Printf("User LEFT JOIN Profile: %s (params: %v)\n", sql9, params9)
+	
+	// User -> Profile LEFT JOIN with condition
+	sql10, params10 := query.Select[tables.User](
+		user.LeftJoinProfile(profile.Bio(ast.OpEqual, "Engineer")),
+		user.Name(ast.OpLike, "J%"),
+	)
+	fmt.Printf("User LEFT JOIN Profile with conditions: %s (params: %v)\n", sql10, params10)
+	
+	// Profile -> User LEFT JOIN (ユーザーがいないプロフィールも含む)
+	sql11, params11 := query.Select[tables.Profile](
+		profile.LeftJoinUser(user.Email(ast.OpLike, "%@company.com")),
+		profile.Bio(ast.OpNotEqual, ""),
+	)
+	fmt.Printf("Profile LEFT JOIN User with conditions: %s (params: %v)\n", sql11, params11)
+
+	// 1対多の関係のJOIN例
+	fmt.Println("\n--- 1-to-Many JOIN Examples ---")
+	
+	// 全ユーザーと投稿を取得（投稿がないユーザーも含む）
+	sql12, params12 := query.Select[tables.User](
+		user.Posts(nil),
+		user.OrderBy("name", ast.DirectionAsc),
+	)
+	fmt.Printf("All users with their posts (including users without posts): %s (params: %v)\n", sql12, params12)
+	
+	// 特定の内容を含む投稿を持つユーザーを取得（投稿がないユーザーも含む）
+	sql13, params13 := query.Select[tables.User](
+		user.Posts(post.Content(ast.OpLike, "%important%")),
+		user.Name(ast.OpNotEqual, "Admin"),
+		user.OrderBy("name", ast.DirectionAsc),
+	)
+	fmt.Printf("Users with important posts (including users without posts): %s (params: %v)\n", sql13, params13)
+	
+	// 投稿から著者情報を結合して取得
+	sql14, params14 := query.Select[tables.Post](
+		post.Author(user.Email(ast.OpLike, "%@company.com")),
+		post.Title(ast.OpLike, "Announcement:%"),
+		post.OrderBy("created_at", ast.DirectionDesc),
+		post.Limit(10),
+	)
+	fmt.Printf("Announcement posts from company authors: %s (params: %v)\n", sql14, params14)
 }

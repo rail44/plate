@@ -10,7 +10,7 @@ type Profile struct{}
 
 func (Profile) TableName() string { return "profile" }
 
-// Order represents the order table (for future extension)
-type Order struct{}
+// Post represents the post table
+type Post struct{}
 
-func (Order) TableName() string { return "order" }
+func (Post) TableName() string { return "post" }

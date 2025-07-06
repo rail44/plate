@@ -14,6 +14,21 @@ func JoinUser(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.P
 		TargetTable: "user",
 		BaseKey:     "user_id",
 		TargetKey:   "id",
+		JoinType:    ast.InnerJoin,
+	}, func(s *types.State, expr *ast.Expr) {
+		if whereOpt != nil {
+			whereOpt(s, expr)
+		}
+	}))
+}
+
+func LeftJoinUser(whereOpt types.ExprOption[tables.User]) types.QueryOption[tables.Profile] {
+	return types.QueryOption[tables.Profile](query.BuildJoin(query.JoinConfig{
+		BaseTable:   "profile",
+		TargetTable: "user",
+		BaseKey:     "user_id",
+		TargetKey:   "id",
+		JoinType:    ast.LeftOuterJoin,
 	}, func(s *types.State, expr *ast.Expr) {
 		if whereOpt != nil {
 			whereOpt(s, expr)

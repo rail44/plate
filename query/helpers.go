@@ -190,6 +190,7 @@ type JoinConfig struct {
 	TargetTable string
 	BaseKey     string
 	TargetKey   string
+	JoinType    ast.JoinOp  // JOIN type (INNER, LEFT OUTER, etc.)
 }
 
 // BuildJoin creates a JOIN operation with the given configuration
@@ -220,7 +221,7 @@ func BuildJoin(config JoinConfig, whereOpt func(*types.State, *ast.Expr)) func(*
 		// Create JOIN structure
 		join := &ast.Join{
 			Left: sl.From.Source,
-			Op:   ast.InnerJoin,
+			Op:   config.JoinType,
 			Right: &ast.TableName{
 				Table: &ast.Ident{
 					Name: tableName,
