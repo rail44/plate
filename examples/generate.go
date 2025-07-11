@@ -4,7 +4,7 @@ package main
 
 import (
 	"log"
-	
+
 	"github.com/rail44/plate"
 	"github.com/rail44/plate/examples/models"
 )
@@ -15,27 +15,27 @@ func main() {
 		TableName: "user",
 		Model:     models.User{},
 	}
-	
+
 	postSchema := plate.TableSchema{
 		TableName: "post",
 		Model:     models.Post{},
 	}
-	
+
 	tagSchema := plate.TableSchema{
 		TableName: "tag",
 		Model:     models.Tag{},
 	}
-	
+
 	postTagSchema := plate.TableSchema{
 		TableName: "post_tag",
 		Model:     models.PostTag{},
 	}
-	
-	// Configure generator
-	config := plate.GeneratorConfig{
+
+	// Define database schema
+	schema := plate.Schema{
 		Tables: []plate.TableConfig{
 			{
-				Schema: userSchema,
+				Schema:    userSchema,
 				Relations: []plate.Relation{
 					// No BelongsTo relations for User
 				},
@@ -53,7 +53,7 @@ func main() {
 				},
 			},
 			{
-				Schema: tagSchema,
+				Schema:    tagSchema,
 				Relations: []plate.Relation{
 					// No BelongsTo relations for Tag
 				},
@@ -81,19 +81,16 @@ func main() {
 			},
 		},
 	}
-	
-	// Generate code
+
+	// Generate code (with clean to remove old files)
 	gen := plate.NewGenerator()
-	files, err := gen.Generate(config, "./generated")
-	if err != nil {
+	opts := plate.GenerateOptions{
+		OutputDir: "./generated",
+		Clean:     true,
+	}
+	if err := gen.Generate(schema, opts); err != nil {
 		log.Fatal(err)
 	}
-	
-	// Write generated files
-	err = files.WriteToDirectory("./generated")
-	if err != nil {
-		log.Fatal(err)
-	}
-	
+
 	log.Println("Code generation completed successfully!")
 }

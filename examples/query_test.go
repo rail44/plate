@@ -3,10 +3,10 @@ package main
 import (
 	"testing"
 	"time"
-	
+
 	"github.com/cloudspannerecosystem/memefish/ast"
 	"github.com/rail44/plate/examples/generated/post"
-	"github.com/rail44/plate/examples/generated/tag" 
+	"github.com/rail44/plate/examples/generated/tag"
 	"github.com/rail44/plate/examples/generated/user"
 )
 

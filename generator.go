@@ -9,10 +9,16 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// GeneratorConfig holds the configuration for generating query builders
-type GeneratorConfig struct {
+// Schema defines the database schema for generating query builders
+type Schema struct {
 	Tables    []TableConfig
 	Junctions []JunctionConfig
+}
+
+// GenerateOptions holds options for code generation
+type GenerateOptions struct {
+	OutputDir string
+	Clean     bool
 }
 
 // TableConfig represents a table that needs a query builder
@@ -44,7 +50,7 @@ type Relation struct {
 
 // Generator is responsible for generating query builder code
 type Generator struct {
-	config    GeneratorConfig
+	schema    Schema
 	outputDir string
 }
 
@@ -53,9 +59,9 @@ func NewGenerator() *Generator {
 	return &Generator{}
 }
 
-// Generate generates query builder code based on the provided configuration
-func (g *Generator) Generate(config GeneratorConfig, outputDir string) (GeneratedFiles, error) {
-	g.config = config
+// GenerateFiles generates query builder code and returns the files without writing them
+func (g *Generator) GenerateFiles(schema Schema, outputDir string) (GeneratedFiles, error) {
+	g.schema = schema
 	g.outputDir = outputDir
 
 	// Validate configuration
@@ -78,7 +84,7 @@ func (g *Generator) Generate(config GeneratorConfig, outputDir string) (Generate
 	files["tables/tables.go"] = tablesCode
 
 	// Generate query builder packages
-	for _, tc := range g.config.Tables {
+	for _, tc := range g.schema.Tables {
 		typeName := g.getTypeName(tc.Schema)
 		packageName := g.toPackageName(typeName)
 
@@ -92,12 +98,25 @@ func (g *Generator) Generate(config GeneratorConfig, outputDir string) (Generate
 	return GeneratedFiles{Files: files}, nil
 }
 
+// Generate generates and writes query builder code to the output directory
+func (g *Generator) Generate(schema Schema, opts GenerateOptions) error {
+	files, err := g.GenerateFiles(schema, opts.OutputDir)
+	if err != nil {
+		return err
+	}
+
+	if opts.Clean {
+		return files.WriteToDirectoryClean(opts.OutputDir)
+	}
+	return files.WriteToDirectory(opts.OutputDir)
+}
+
 // validateConfig validates the generator configuration
 func (g *Generator) validateConfig() error {
 	// Check for duplicate table names
 	seen := make(map[string]bool)
 
-	for _, tc := range g.config.Tables {
+	for _, tc := range g.schema.Tables {
 		name := g.getTypeName(tc.Schema)
 		if seen[name] {
 			return fmt.Errorf("duplicate table: %s", name)
@@ -106,7 +125,7 @@ func (g *Generator) validateConfig() error {
 	}
 
 	// Validate junction tables have exactly 2 relations
-	for _, jc := range g.config.Junctions {
+	for _, jc := range g.schema.Junctions {
 		if len(jc.Relations) != 2 {
 			name := g.getTypeName(jc.Schema)
 			return fmt.Errorf("junction table %s must have exactly 2 relations, got %d", name, len(jc.Relations))
@@ -133,12 +152,12 @@ func (g *Generator) toPackageName(typeName string) string {
 func (g *Generator) buildTableMap() map[string]TableSchema {
 	m := make(map[string]TableSchema)
 
-	for _, tc := range g.config.Tables {
+	for _, tc := range g.schema.Tables {
 		name := g.getTypeName(tc.Schema)
 		m[name] = tc.Schema
 	}
 
-	for _, jc := range g.config.Junctions {
+	for _, jc := range g.schema.Junctions {
 		name := g.getTypeName(jc.Schema)
 		m[name] = jc.Schema
 	}
@@ -151,7 +170,7 @@ func (g *Generator) buildRelationMap() map[string][]generatedRelation {
 	relations := make(map[string][]generatedRelation)
 
 	// 1. Process BelongsTo relations from regular tables
-	for _, tc := range g.config.Tables {
+	for _, tc := range g.schema.Tables {
 		typeName := g.getTypeName(tc.Schema)
 
 		for _, rel := range tc.Relations {
@@ -176,7 +195,7 @@ func (g *Generator) buildRelationMap() map[string][]generatedRelation {
 	}
 
 	// 2. Process junction tables to generate ManyToMany relations
-	for _, jc := range g.config.Junctions {
+	for _, jc := range g.schema.Junctions {
 		if len(jc.Relations) != 2 {
 			continue // Skip invalid junction tables
 		}
@@ -234,7 +253,7 @@ func (g *Generator) generateTablesPackage(tableMap map[string]TableSchema) (stri
 	var tables []tableTemplateData
 	for typeName, schema := range tableMap {
 		// Only include tables that have query builders
-		for _, tc := range g.config.Tables {
+		for _, tc := range g.schema.Tables {
 			if g.getTypeName(tc.Schema) == typeName {
 				tables = append(tables, tableTemplateData{
 					TypeName:  typeName,

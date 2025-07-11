@@ -11,23 +11,27 @@ import (
 type WriteOptions struct {
 	// BaseDir is the base directory where files will be written
 	BaseDir string
-	// Overwrite determines whether to overwrite existing files
-	Overwrite bool
-	// Format determines whether to format the generated code
-	Format bool
+	// Clean determines whether to remove the output directory before writing
+	Clean bool
 }
 
 // defaultWriteOptions returns default write options
 func defaultWriteOptions() WriteOptions {
 	return WriteOptions{
-		BaseDir:   ".",
-		Overwrite: true,
-		Format:    true,
+		BaseDir: ".",
+		Clean:   false, // Keep false by default for safety
 	}
 }
 
 // writeFiles writes the generated files to disk
 func writeFiles(files map[string]string, opts WriteOptions) error {
+	// Clean the base directory if requested
+	if opts.Clean && opts.BaseDir != "" && opts.BaseDir != "." {
+		if err := os.RemoveAll(opts.BaseDir); err != nil {
+			return fmt.Errorf("failed to clean directory %s: %w", opts.BaseDir, err)
+		}
+	}
+
 	for path, content := range files {
 		if err := writeFile(filepath.Join(opts.BaseDir, path), content, opts); err != nil {
 			return fmt.Errorf("failed to write %s: %w", path, err)
@@ -44,13 +48,8 @@ func writeFile(path, content string, opts WriteOptions) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
-	// Check if file exists and whether we should overwrite
-	if _, err := os.Stat(path); err == nil && !opts.Overwrite {
-		return fmt.Errorf("file already exists: %s", path)
-	}
-
-	// Format code if requested
-	if opts.Format && filepath.Ext(path) == ".go" {
+	// Format Go code
+	if filepath.Ext(path) == ".go" {
 		formatted, err := format.Source([]byte(content))
 		if err != nil {
 			// If formatting fails, write the original content and warn
@@ -82,4 +81,11 @@ func (gf GeneratedFiles) WriteToDirectory(dir string) error {
 func (gf GeneratedFiles) WriteToDirectoryWithOptions(dir string, opts WriteOptions) error {
 	opts.BaseDir = dir
 	return writeFiles(gf.Files, opts)
+}
+
+// WriteToDirectoryClean writes all generated files after cleaning the directory
+func (gf GeneratedFiles) WriteToDirectoryClean(dir string) error {
+	opts := defaultWriteOptions()
+	opts.Clean = true
+	return gf.WriteToDirectoryWithOptions(dir, opts)
 }
