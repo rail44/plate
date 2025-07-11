@@ -81,13 +81,10 @@ func Not(opt types.ExprOption[tables.{{.TypeName}}]) types.ExprOption[tables.{{.
 {{range .Relations}}
 {{if eq .Type "belongs_to"}}// With{{.Name}} fetches related {{.Target}} as a nested struct
 func With{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
-	return query.WithSubquery[tables.{{$.TypeName}}, tables.{{.Target}}](
+	return query.WithOne[tables.{{$.TypeName}}, tables.{{.Target}}](
 		"{{.Name | toSnakeCase}}",
 		"{{.Target | toSnakeCase}}",
 		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
-		false, // not an array
-		"",    // no junction table
-		query.KeyPair{},
 		opts...,
 	)
 }
@@ -104,13 +101,10 @@ func Where{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.ExprOption[t
 }
 {{else if eq .Type "has_many"}}// With{{.Name}} fetches related {{.Target}} as a nested array of structs
 func With{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
-	return query.WithSubquery[tables.{{$.TypeName}}, tables.{{.Target}}](
+	return query.WithMany[tables.{{$.TypeName}}, tables.{{.Target}}](
 		"{{.Name | toSnakeCase}}",
 		"{{.Target | toSnakeCase}}",
 		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
-		true,  // array
-		"",    // no junction table
-		query.KeyPair{},
 		opts...,
 	)
 }
@@ -127,11 +121,10 @@ func Where{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.ExprOption[t
 }
 {{else if eq .Type "many_to_many"}}// With{{.Name}} fetches related {{.Target}} through {{.JunctionTable | toSnakeCase}} as a nested array of structs
 func With{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
-	return query.WithSubquery[tables.{{$.TypeName}}, tables.{{.Target}}](
+	return query.WithManyThrough[tables.{{$.TypeName}}, tables.{{.Target}}](
 		"{{.Name | toSnakeCase}}",
 		"{{.Target | toSnakeCase}}",
 		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
-		true,  // array
 		"{{.JunctionTable | toSnakeCase}}",
 		query.KeyPair{From: "{{.JunctionKeys.From | toSnakeCase}}", To: "{{.JunctionKeys.To | toSnakeCase}}"},
 		opts...,

@@ -50,11 +50,10 @@ func Not(opt types.ExprOption[tables.Tag]) types.ExprOption[tables.Tag] {
 
 // WithPosts fetches related Post through post_tag as a nested array of structs
 func WithPosts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
-	return query.WithSubquery[tables.Tag, tables.Post](
+	return query.WithManyThrough[tables.Tag, tables.Post](
 		"posts",
 		"post",
 		query.KeyPair{From: "id", To: "tag_id"},
-		true, // array
 		"post_tag",
 		query.KeyPair{From: "post_id", To: "id"},
 		opts...,

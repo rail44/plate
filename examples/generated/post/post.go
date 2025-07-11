@@ -63,13 +63,10 @@ func Not(opt types.ExprOption[tables.Post]) types.ExprOption[tables.Post] {
 
 // WithAuthor fetches related User as a nested struct
 func WithAuthor(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
-	return query.WithSubquery[tables.Post, tables.User](
+	return query.WithOne[tables.Post, tables.User](
 		"author",
 		"user",
 		query.KeyPair{From: "user_id", To: "id"},
-		false, // not an array
-		"",    // no junction table
-		query.KeyPair{},
 		opts...,
 	)
 }
@@ -87,11 +84,10 @@ func WhereAuthor(opts ...types.Option[tables.User]) types.ExprOption[tables.Post
 
 // WithTags fetches related Tag through post_tag as a nested array of structs
 func WithTags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
-	return query.WithSubquery[tables.Post, tables.Tag](
+	return query.WithManyThrough[tables.Post, tables.Tag](
 		"tags",
 		"tag",
 		query.KeyPair{From: "id", To: "post_id"},
-		true, // array
 		"post_tag",
 		query.KeyPair{From: "tag_id", To: "id"},
 		opts...,

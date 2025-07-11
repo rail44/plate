@@ -192,101 +192,180 @@ func Limit[T types.Table](count int) types.QueryOption[T] {
 	}
 }
 
-// WithSubquery adds a subquery column to the SELECT clause
-// For belongs_to: (SELECT AS STRUCT t.* FROM t WHERE ...)
-// For has_many/many_to_many: ARRAY(SELECT AS STRUCT t.* FROM t WHERE ...)
-func WithSubquery[TBase types.Table, TTarget types.Table](
+// WithOne adds a single-value subquery column (for belongs_to relationships)
+// Generates: (SELECT AS STRUCT t.* FROM t WHERE t.id = parent.foreign_key)
+func WithOne[TBase types.Table, TTarget types.Table](
 	relationshipName string,
 	targetTable string,
 	keys KeyPair,
-	isArray bool,
-	junctionTable string, // empty for direct relationships
-	junctionKeys KeyPair, // empty for direct relationships
+	opts ...types.Option[TTarget],
+) types.QueryOption[TBase] {
+	return withSingleSubquery[TBase, TTarget](relationshipName, targetTable, keys, "", KeyPair{}, opts...)
+}
+
+// WithMany adds an array subquery column (for has_many relationships)
+// Generates: ARRAY(SELECT AS STRUCT t.* FROM t WHERE t.foreign_key = parent.id)
+func WithMany[TBase types.Table, TTarget types.Table](
+	relationshipName string,
+	targetTable string,
+	keys KeyPair,
+	opts ...types.Option[TTarget],
+) types.QueryOption[TBase] {
+	return withManySubquery[TBase, TTarget](relationshipName, targetTable, keys, opts...)
+}
+
+// WithManyThrough adds an array subquery column (for many_to_many relationships through a junction table)
+// Generates: ARRAY(SELECT AS STRUCT t.* FROM t JOIN junction ON ... WHERE junction.foreign_key = parent.id)
+func WithManyThrough[TBase types.Table, TTarget types.Table](
+	relationshipName string,
+	targetTable string,
+	keys KeyPair,
+	junctionTable string,
+	junctionKeys KeyPair,
+	opts ...types.Option[TTarget],
+) types.QueryOption[TBase] {
+	return withManyThroughSubquery[TBase, TTarget](relationshipName, targetTable, keys, junctionTable, junctionKeys, opts...)
+}
+
+// withSingleSubquery handles single-value subqueries (belongs_to relationships)
+func withSingleSubquery[TBase types.Table, TTarget types.Table](
+	relationshipName string,
+	targetTable string,
+	keys KeyPair,
+	junctionTable string,
+	junctionKeys KeyPair,
 	opts ...types.Option[TTarget],
 ) types.QueryOption[TBase] {
 	return func(s *types.State, q *ast.Query) {
 		sq := newSubquery(s, targetTable, keys, junctionTable, junctionKeys)
-		subState := sq.createSubState()
 
 		// Build basic subquery
 		subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
 
 		// Apply options
-		sq.applyOptions(subState, subQuery, convertOptions(opts))
+		sq.applyOptions(subQuery, convertOptions(opts))
 
-		// Create the final subquery expression
-		var subqueryExpr ast.Expr
+		// Create scalar subquery for single value
+		subSelect := subQuery.Query.(*ast.Select)
+		subqueryExpr := &ast.ScalarSubQuery{
+			Query: &ast.Query{
+				Query: &ast.Select{
+					As:      &ast.AsStruct{},
+					Results: subSelect.Results,
+					From:    subSelect.From,
+					Where:   subSelect.Where,
+				},
+			},
+		}
+
+		// Add to state's subquery columns
+		s.SubqueryColumns = append(s.SubqueryColumns, types.SubqueryColumn{
+			Alias:    relationshipName,
+			Subquery: subqueryExpr,
+		})
+	}
+}
+
+// withManySubquery handles direct has_many array subqueries
+func withManySubquery[TBase types.Table, TTarget types.Table](
+	relationshipName string,
+	targetTable string,
+	keys KeyPair,
+	opts ...types.Option[TTarget],
+) types.QueryOption[TBase] {
+	return func(s *types.State, q *ast.Query) {
+		sq := newSubquery(s, targetTable, keys, "", KeyPair{})
+
+		// Build basic subquery
+		subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
+
+		// Apply options
+		sq.applyOptions(subQuery, convertOptions(opts))
+
+		// Create direct has_many array subquery
+		subSelect := subQuery.Query.(*ast.Select)
+		structSelect := &ast.Select{
+			As:      &ast.AsStruct{},
+			Results: []ast.SelectItem{&ast.Star{}},
+			From: &ast.From{
+				Source: &ast.TableName{
+					Table: &ast.Ident{Name: targetTable},
+				},
+			},
+			Where: subSelect.Where,
+		}
+
+		subqueryExpr := &ast.ArraySubQuery{
+			Query: &ast.Query{
+				Query: structSelect,
+			},
+		}
+
+		// Add to state's subquery columns
+		s.SubqueryColumns = append(s.SubqueryColumns, types.SubqueryColumn{
+			Alias:    relationshipName,
+			Subquery: subqueryExpr,
+		})
+	}
+}
+
+// withManyThroughSubquery handles many-to-many array subqueries through junction tables
+func withManyThroughSubquery[TBase types.Table, TTarget types.Table](
+	relationshipName string,
+	targetTable string,
+	keys KeyPair,
+	junctionTable string,
+	junctionKeys KeyPair,
+	opts ...types.Option[TTarget],
+) types.QueryOption[TBase] {
+	return func(s *types.State, q *ast.Query) {
+		sq := newSubquery(s, targetTable, keys, junctionTable, junctionKeys)
+
+		// Build basic subquery
+		subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
+
+		// Apply options
+		sq.applyOptions(subQuery, convertOptions(opts))
+
+		// Create many-to-many array subquery with JOIN
 		subSelect := subQuery.Query.(*ast.Select)
 
-		if isArray {
-			// ARRAY for has_many and many_to_many
-			var structSelect *ast.Select
+		// Check for additional WHERE conditions from options
+		var additionalWhere ast.Expr
+		if subSelect.Where != nil {
+			additionalWhere = subSelect.Where.Expr
+		}
 
-			if junctionTable == "" {
-				// Direct has_many relationship
-				structSelect = &ast.Select{
-					As:      &ast.AsStruct{},
-					Results: []ast.SelectItem{&ast.Star{}},
-					From: &ast.From{
-						Source: &ast.TableName{
-							Table: &ast.Ident{Name: targetTable},
-						},
-					},
-					Where: subSelect.Where,
-				}
-			} else {
-				// Many-to-many through junction table - use JOIN for efficiency
-				// First, check if there are additional WHERE conditions from options
-				var additionalWhere ast.Expr
-				if subSelect.Where != nil {
-					additionalWhere = subSelect.Where.Expr
-				}
-
-				structSelect = &ast.Select{
-					As: &ast.AsStruct{},
-					Results: []ast.SelectItem{
-						&ast.DotStar{
-							Expr: &ast.Path{
-								Idents: []*ast.Ident{{Name: targetTable}},
-							},
-						},
-					},
-					From: &ast.From{
-						Source: sq.buildJunctionJoin(),
-					},
-					Where: &ast.Where{
-						Expr: sq.buildJunctionCorrelation(),
-					},
-				}
-
-				// Apply additional WHERE conditions from options
-				if additionalWhere != nil {
-					structSelect.Where.Expr = &ast.BinaryExpr{
-						Op:    ast.OpAnd,
-						Left:  structSelect.Where.Expr,
-						Right: additionalWhere,
-					}
-				}
-			}
-
-			// Use ArraySubQuery for cleaner SQL
-			subqueryExpr = &ast.ArraySubQuery{
-				Query: &ast.Query{
-					Query: structSelect,
-				},
-			}
-		} else {
-			// Single STRUCT for belongs_to
-			subqueryExpr = &ast.ScalarSubQuery{
-				Query: &ast.Query{
-					Query: &ast.Select{
-						As:      &ast.AsStruct{},
-						Results: subSelect.Results,
-						From:    subSelect.From,
-						Where:   subSelect.Where,
+		structSelect := &ast.Select{
+			As: &ast.AsStruct{},
+			Results: []ast.SelectItem{
+				&ast.DotStar{
+					Expr: &ast.Path{
+						Idents: []*ast.Ident{{Name: targetTable}},
 					},
 				},
+			},
+			From: &ast.From{
+				Source: sq.buildJunctionJoin(),
+			},
+			Where: &ast.Where{
+				Expr: sq.buildJunctionCorrelation(),
+			},
+		}
+
+		// Apply additional WHERE conditions from options
+		if additionalWhere != nil {
+			structSelect.Where.Expr = &ast.BinaryExpr{
+				Op:    ast.OpAnd,
+				Left:  structSelect.Where.Expr,
+				Right: additionalWhere,
 			}
+		}
+
+		subqueryExpr := &ast.ArraySubQuery{
+			Query: &ast.Query{
+				Query: structSelect,
+			},
 		}
 
 		// Add to state's subquery columns
@@ -308,7 +387,6 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 ) types.ExprOption[TBase] {
 	return func(s *types.State, expr *ast.Expr) {
 		sq := newSubquery(s, targetTable, keys, junctionTable, junctionKeys)
-		subState := sq.createSubState()
 
 		// Create EXISTS subquery with SELECT 1
 		selectItems := []ast.SelectItem{
@@ -337,7 +415,7 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 		}
 
 		// Apply options
-		sq.applyOptions(subState, subQuery, convertOptions(opts))
+		sq.applyOptions(subQuery, convertOptions(opts))
 
 		// Create EXISTS expression
 		*expr = &ast.ExistsSubQuery{

@@ -8,6 +8,7 @@ import (
 // subquery holds common data for building subqueries
 type subquery struct {
 	parentState   *types.State
+	subState      *types.State
 	baseAlias     string
 	targetTable   string
 	keys          KeyPair
@@ -17,7 +18,7 @@ type subquery struct {
 
 // newSubquery creates a new subquery builder
 func newSubquery(parentState *types.State, targetTable string, keys KeyPair, junctionTable string, junctionKeys KeyPair) *subquery {
-	return &subquery{
+	sq := &subquery{
 		parentState:   parentState,
 		baseAlias:     parentState.CurrentAlias(),
 		targetTable:   targetTable,
@@ -25,11 +26,8 @@ func newSubquery(parentState *types.State, targetTable string, keys KeyPair, jun
 		junctionTable: junctionTable,
 		junctionKeys:  junctionKeys,
 	}
-}
-
-// createSubState creates a new state for the subquery
-func (sq *subquery) createSubState() *types.State {
-	return sq.parentState.NewSubqueryState(sq.targetTable)
+	sq.subState = parentState.NewSubqueryState(targetTable)
+	return sq
 }
 
 // buildDirectRelationshipWhere builds WHERE clause for direct relationships
@@ -120,10 +118,10 @@ func (sq *subquery) buildBasicSubquery(selectItems []ast.SelectItem) *ast.Query 
 }
 
 // applyOptions applies the given options to the subquery
-func (sq *subquery) applyOptions(subState *types.State, subQuery *ast.Query, opts []types.Option[types.Table]) {
+func (sq *subquery) applyOptions(subQuery *ast.Query, opts []types.Option[types.Table]) {
 	for _, opt := range opts {
-		opt.Apply(subState, subQuery)
+		opt.Apply(sq.subState, subQuery)
 	}
 	// Update parent state params
-	sq.parentState.Params = subState.Params
+	sq.parentState.Params = sq.subState.Params
 }
