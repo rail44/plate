@@ -397,53 +397,8 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 				},
 			}
 		} else {
-			// Many-to-many through junction
-			whereExpr = &ast.InExpr{
-				Left: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: targetTable},
-						{Name: junctionKeys.To},
-					},
-				},
-				Right: &ast.SubQueryInCondition{
-					Query: &ast.Query{
-						Query: &ast.Select{
-							Results: []ast.SelectItem{
-								&ast.ExprSelectItem{
-									Expr: &ast.Path{
-										Idents: []*ast.Ident{
-											{Name: junctionTable},
-											{Name: junctionKeys.From},
-										},
-									},
-								},
-							},
-							From: &ast.From{
-								Source: &ast.TableName{
-									Table: &ast.Ident{Name: junctionTable},
-								},
-							},
-							Where: &ast.Where{
-								Expr: &ast.BinaryExpr{
-									Left: &ast.Path{
-										Idents: []*ast.Ident{
-											{Name: junctionTable},
-											{Name: keys.To},
-										},
-									},
-									Op: ast.OpEqual,
-									Right: &ast.Path{
-										Idents: []*ast.Ident{
-											{Name: baseAlias},
-											{Name: keys.From},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
+			// Many-to-many through junction - no WHERE needed here since we'll use JOIN
+			whereExpr = nil
 		}
 
 		// Apply options to add more WHERE conditions
@@ -457,10 +412,14 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 						Table: &ast.Ident{Name: targetTable},
 					},
 				},
-				Where: &ast.Where{
-					Expr: whereExpr,
-				},
 			},
+		}
+		
+		// Add WHERE clause only if we have a where expression
+		if whereExpr != nil {
+			subQuery.Query.(*ast.Select).Where = &ast.Where{
+				Expr: whereExpr,
+			}
 		}
 
 		// Apply options
@@ -477,16 +436,92 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 
 		if isArray {
 			// ARRAY for has_many and many_to_many
-			// Create SELECT AS STRUCT for the inner query
-			structSelect := &ast.Select{
-				As:      &ast.AsStruct{},
-				Results: []ast.SelectItem{&ast.Star{}},
-				From: &ast.From{
-					Source: &ast.TableName{
-						Table: &ast.Ident{Name: targetTable},
+			var structSelect *ast.Select
+			
+			if junctionTable == "" {
+				// Direct has_many relationship
+				structSelect = &ast.Select{
+					As:      &ast.AsStruct{},
+					Results: []ast.SelectItem{&ast.Star{}},
+					From: &ast.From{
+						Source: &ast.TableName{
+							Table: &ast.Ident{Name: targetTable},
+						},
 					},
-				},
-				Where: subSelect.Where,
+					Where: subSelect.Where,
+				}
+			} else {
+				// Many-to-many through junction table - use JOIN for efficiency
+				// First, check if there are additional WHERE conditions from options
+				var additionalWhere ast.Expr
+				if subSelect.Where != nil {
+					additionalWhere = subSelect.Where.Expr
+				}
+				
+				structSelect = &ast.Select{
+					As:      &ast.AsStruct{},
+					Results: []ast.SelectItem{
+						&ast.DotStar{
+							Expr: &ast.Path{
+								Idents: []*ast.Ident{{Name: targetTable}},
+							},
+						},
+					},
+					From: &ast.From{
+						Source: &ast.Join{
+							Op: ast.InnerJoin,
+							Left: &ast.TableName{
+								Table: &ast.Ident{Name: targetTable},
+							},
+							Right: &ast.TableName{
+								Table: &ast.Ident{Name: junctionTable},
+							},
+							Cond: &ast.On{
+								Expr: &ast.BinaryExpr{
+									Left: &ast.Path{
+										Idents: []*ast.Ident{
+											{Name: targetTable},
+											{Name: junctionKeys.To},
+										},
+									},
+									Op: ast.OpEqual,
+									Right: &ast.Path{
+										Idents: []*ast.Ident{
+											{Name: junctionTable},
+											{Name: junctionKeys.From},
+										},
+									},
+								},
+							},
+						},
+					},
+					Where: &ast.Where{
+						Expr: &ast.BinaryExpr{
+							Left: &ast.Path{
+								Idents: []*ast.Ident{
+									{Name: junctionTable},
+									{Name: keys.To},
+								},
+							},
+							Op: ast.OpEqual,
+							Right: &ast.Path{
+								Idents: []*ast.Ident{
+									{Name: baseAlias},
+									{Name: keys.From},
+								},
+							},
+						},
+					},
+				}
+				
+				// Apply additional WHERE conditions from options
+				if additionalWhere != nil {
+					structSelect.Where.Expr = &ast.BinaryExpr{
+						Op:    ast.OpAnd,
+						Left:  structSelect.Where.Expr,
+						Right: additionalWhere,
+					}
+				}
 			}
 
 			// Use ArraySubQuery for cleaner SQL
@@ -666,9 +701,7 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 		// Create EXISTS expression
 		*expr = &ast.ExistsSubQuery{
 			Exists: 0, // Token position will be set by memefish
-			Query: &ast.SubQuery{
-				Query: subQuery,
-			},
+			Query: subQuery,
 		}
 	}
 }

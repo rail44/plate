@@ -76,7 +76,7 @@ func TestUserQueries(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT user.* FROM user WHERE EXISTS((SELECT 1 FROM post WHERE post.user_id = user.id AND post.title = @p0))",
+			wantSQL:  "SELECT user.* FROM user WHERE EXISTS(SELECT 1 FROM post WHERE post.user_id = user.id AND post.title = @p0)",
 			wantArgs: []any{"Hello World"},
 		},
 	}
@@ -128,7 +128,7 @@ func TestPostQueries(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT post.*, ARRAY(SELECT AS STRUCT * FROM tag WHERE tag.id IN (SELECT post_tag.tag_id FROM post_tag WHERE post_tag.post_id = post.id) AND tag.name = @p0) AS tags FROM post",
+			wantSQL:  "SELECT post.*, ARRAY(SELECT AS STRUCT tag.* FROM tag INNER JOIN post_tag ON tag.id = post_tag.tag_id WHERE post_tag.post_id = post.id AND tag.name = @p0) AS tags FROM post",
 			wantArgs: []any{"golang"},
 		},
 		{
@@ -143,7 +143,7 @@ func TestPostQueries(t *testing.T) {
 					post.Limit(5),
 				)
 			},
-			wantSQL:  "SELECT post.* FROM post WHERE post.title LIKE @p0 AND EXISTS((SELECT 1 FROM user WHERE user.id = post.user_id AND user.email = @p1)) ORDER BY post.created_at DESC LIMIT 5",
+			wantSQL:  "SELECT post.* FROM post WHERE post.title LIKE @p0 AND EXISTS(SELECT 1 FROM user WHERE user.id = post.user_id AND user.email = @p1) ORDER BY post.created_at DESC LIMIT 5",
 			wantArgs: []any{"%tutorial%", "author@example.com"},
 		},
 	}
