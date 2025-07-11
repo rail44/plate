@@ -6,21 +6,25 @@ import (
 	"testing"
 )
 
-// TestExamplesIntegration runs the examples tests
+// TestExamplesIntegration runs the examples tests with fresh code generation
 func TestExamplesIntegration(t *testing.T) {
-	// Skip in short mode
-	if testing.Short() {
-		t.Skip("Skipping integration test in short mode")
-	}
-	
-	// Run tests in examples directory
-	// Note: examples/main_test.go will automatically run go generate before tests
 	examplesDir := filepath.Join(".", "examples")
 	
-	t.Log("Running tests in examples...")
+	// Step 1: Generate fresh code BEFORE compiling tests
+	t.Log("Generating fresh code...")
+	generateCmd := exec.Command("go", "generate", "./...")
+	generateCmd.Dir = examplesDir
+	output, err := generateCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Failed to generate code: %v\nOutput:\n%s", err, output)
+	}
+	
+	// Step 2: Run tests with the newly generated code
+	// This ensures the tests compile and run with the latest generated code
+	t.Log("Running tests with fresh generated code...")
 	testCmd := exec.Command("go", "test", "-v")
 	testCmd.Dir = examplesDir
-	output, err := testCmd.CombinedOutput()
+	output, err = testCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Failed to run tests: %v\nOutput:\n%s", err, output)
 	}
