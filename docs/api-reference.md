@@ -90,8 +90,11 @@ user.Email().NotLike("%spam%")      // user.email NOT LIKE @p0
 
 ### Ordering
 
+Each generated table package provides its own OrderBy function:
+
 ```go
-func OrderBy[V any](column Column[T, V], dir ast.Direction) QueryOption[T]
+// In user package
+func OrderBy[V any](column types.Column[tables.User, V], dir ast.Direction) types.QueryOption[tables.User]
 ```
 
 **Direction Constants:**
@@ -106,29 +109,16 @@ post.OrderBy(post.Title(), ast.DirectionDesc)    // ORDER BY post.title DESC
 
 ### Limiting
 
+Each generated table package provides its own Limit function:
+
 ```go
-func Limit(count int) QueryOption[T]
+// In user package
+func Limit(count int) types.QueryOption[tables.User]
 ```
 
 **Example:**
 ```go
 user.Limit(10)    // LIMIT 10
-```
-
-### JOIN Type Control
-
-```go
-func WithInnerJoin() QueryOption[T]
-```
-
-Changes the most recent JOIN from LEFT OUTER JOIN to INNER JOIN.
-
-**Example:**
-```go
-user.Posts(
-    post.Title().Like("%important%"),
-    post.WithInnerJoin(),  // Use INNER JOIN instead of LEFT OUTER JOIN
-)
 ```
 
 ## Boolean Logic
@@ -137,7 +127,7 @@ user.Posts(
 Multiple conditions passed to `Select` are combined with AND by default:
 
 ```go
-query.Select[tables.User](
+user.Select(
     user.Name().Eq("John"),        // Condition 1
     user.Email().IsNotNull(),      // AND Condition 2
     user.ID().Gt("100"),          // AND Condition 3
@@ -147,8 +137,11 @@ query.Select[tables.User](
 
 ### OR Operations
 
+Each generated table package provides its own Or function:
+
 ```go
-func Or(opts ...ExprOption[T]) ExprOption[T]
+// In user package
+func Or(opts ...types.ExprOption[tables.User]) types.ExprOption[tables.User]
 ```
 
 **Examples:**
@@ -175,16 +168,22 @@ user.Or(
 
 ### AND Operations (Explicit)
 
+Each generated table package provides its own And function:
+
 ```go
-func And(opts ...ExprOption[T]) ExprOption[T]
+// In user package
+func And(opts ...types.ExprOption[tables.User]) types.ExprOption[tables.User]
 ```
 
 Used for grouping conditions within OR operations.
 
 ### NOT Operations
 
+Each generated table package provides its own Not function:
+
 ```go
-func Not(opt ExprOption[T]) ExprOption[T]
+// In user package
+func Not(opt types.ExprOption[tables.User]) types.ExprOption[tables.User]
 ```
 
 Creates a logical NOT condition that wraps any ExprOption. This allows negation of complex expressions including And() and Or() combinations.
@@ -212,29 +211,36 @@ user.Not(user.And(
 
 ## Relationship Methods
 
-### One-to-Many Relationships
+Plate generates two types of relationship methods:
+
+### WithXxx Methods (Subqueries)
+These methods add related data to the SELECT clause as nested structures.
+
+#### One-to-Many Relationships
 
 ```go
-func Posts(opts ...Option[tables.Post]) QueryOption[tables.User]
+// In user package
+func WithPosts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User]
 ```
 
-**Default Behavior:** LEFT OUTER JOIN
+**Behavior:** Adds posts as nested array using ARRAY(SELECT AS STRUCT ...)
+
 **Examples:**
 ```go
 // All users with their posts
-user.Posts()
+user.WithPosts()
+// Generates: SELECT user.*, ARRAY(SELECT AS STRUCT * FROM post WHERE post.user_id = user.id) AS posts FROM user
 
 // Users with filtered posts
-user.Posts(post.Title().Like("%important%"))
-
-// Users with posts (INNER JOIN - only users who have posts)
-user.Posts(post.WithInnerJoin())
+user.WithPosts(post.Title().Like("%important%"))
+// Generates: SELECT user.*, ARRAY(SELECT AS STRUCT * FROM post WHERE post.user_id = user.id AND post.title LIKE @p0) AS posts FROM user
 ```
 
-### Many-to-Many Relationships
+#### Many-to-Many Relationships
 
 ```go
-func Tags(opts ...Option[tables.Tag]) QueryOption[tables.Post]
+// In post package
+func WithTags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post]
 ```
 
 Joins through junction table (`post_tag`).
@@ -242,47 +248,72 @@ Joins through junction table (`post_tag`).
 **Examples:**
 ```go
 // Posts with any tags
-post.Tags()
+post.WithTags()
+// Generates: SELECT post.*, ARRAY(SELECT AS STRUCT tag.* FROM tag INNER JOIN post_tag ON tag.id = post_tag.tag_id WHERE post_tag.post_id = post.id) AS tags FROM post
 
 // Posts with specific tags
-post.Tags(tag.Name().Eq("Go"))
-
-// Posts with multiple tag conditions
-post.Tags(tag.Or(
-    tag.Name().Eq("Go"),
-    tag.Name().Eq("Tutorial"),
-))
+post.WithTags(tag.Name().Eq("Go"))
 ```
 
-### Belongs-To Relationships
+#### Belongs-To Relationships
 
 ```go
-func Author(opts ...Option[tables.User]) QueryOption[tables.Post]
+// In post package
+func WithAuthor(opts ...types.Option[tables.User]) types.QueryOption[tables.Post]
 ```
 
-**Default Behavior:** INNER JOIN (foreign key relationship)
+**Behavior:** Adds single related record as nested struct
 
 **Examples:**
 ```go
 // Posts with author information
-post.Author()
+post.WithAuthor()
+// Generates: SELECT post.*, (SELECT AS STRUCT * FROM user WHERE user.id = post.user_id) AS author FROM post
 
 // Posts by specific authors
-post.Author(user.Email().Like("%@company.com"))
+post.WithAuthor(user.Email().Like("%@company.com"))
 ```
 
-## Multi-level JOINs
+### WhereXxx Methods (EXISTS filtering)
+These methods filter parent records based on child conditions.
+
+```go
+// In user package
+func WherePosts(opts ...types.Option[tables.Post]) types.ExprOption[tables.User]
+
+// In post package
+func WhereAuthor(opts ...types.Option[tables.User]) types.ExprOption[tables.Post]
+func WhereTags(opts ...types.Option[tables.Tag]) types.ExprOption[tables.Post]
+```
+
+**Examples:**
+```go
+// Users who have posts with "important" in title
+user.Select(
+    user.WherePosts(post.Title().Like("%important%")),
+)
+// Generates: SELECT user.* FROM user WHERE EXISTS(SELECT 1 FROM post WHERE post.user_id = user.id AND post.title LIKE @p0)
+
+// Posts that have "Go" tag
+post.Select(
+    post.WhereTags(tag.Name().Eq("Go")),
+)
+// Generates: SELECT post.* FROM post WHERE EXISTS(SELECT 1 FROM tag INNER JOIN post_tag ON tag.id = post_tag.tag_id WHERE post_tag.post_id = post.id AND tag.name = @p0)
+```
+
+## Multi-level Relationships
 
 Relationships can be nested for complex queries:
 
 ```go
-// User → Posts → Tags (3-level JOIN)
-query.Select[tables.User](
-    user.Posts(
-        post.Tags(tag.Name().Eq("Go")),
+// User → Posts (with tags loaded)
+user.Select(
+    user.WithPosts(
+        post.WithTags(tag.Name().Eq("Go")),
         post.Title().Like("%tutorial%"),
     ),
 )
+// This loads users with their posts, and each post includes its tags
 ```
 
 ## Type Safety Features
@@ -302,19 +333,24 @@ user.ID().Like("123")           // Like only for string columns
 // ❌ Type mismatch
 user.Name().Eq(123)             // Cannot pass int to string column
 
-// ❌ Table type mismatch
-query.Select[tables.User](
+// ❌ Table type mismatch  
+user.Select(
     post.Title().Eq("Test"),    // Cannot use Post expression in User query
 )
 ```
 
 ## Select Function
 
+Each generated table package provides its own Select function:
+
 ```go
-func Select[T Table](opts ...Option[T]) (string, []any)
+// In user package
+func Select(opts ...types.Option[tables.User]) (string, []any)
+
+// In post package  
+func Select(opts ...types.Option[tables.Post]) (string, []any)
 ```
 
-**Generic Parameter:** `T` - Table type for type safety
 **Returns:** 
 - `string` - Generated SQL query
 - `[]any` - Parameter values for prepared statement
@@ -322,14 +358,14 @@ func Select[T Table](opts ...Option[T]) (string, []any)
 **Examples:**
 ```go
 // Basic select
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.Name().Eq("John"),
 )
 
 // Complex select with multiple options
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.Name().Like("J%"),
-    user.Posts(post.Title().Like("%important%")),
+    user.WithPosts(post.Title().Like("%important%")),
     user.OrderBy(user.Name(), ast.DirectionAsc),
     user.Limit(10),
 )
@@ -353,20 +389,20 @@ user.Name().Like("John%")
 user.Or(user.Name().Eq("John"), user.Name().Eq("Jane"))
 
 // Implicit AND for multiple conditions
-query.Select[tables.User](
+user.Select(
     user.Name().Like("J%"),     // AND
     user.Email().IsNotNull(),   // AND  
     user.ID().Gt("100"),       // AND
 )
 ```
 
-### 3. JOIN Type Control
+### 3. Subqueries vs EXISTS Filtering
 ```go
-// Default: LEFT OUTER JOIN (includes users without posts)
-user.Posts()
+// Load related data (subquery in SELECT)
+user.WithPosts()  // Returns users with posts array
 
-// Explicit: INNER JOIN (only users with posts)
-user.Posts(post.WithInnerJoin())
+// Filter by relationship (EXISTS in WHERE)
+user.WherePosts(post.Title().Like("%important%"))  // Only users who have important posts
 ```
 
 ### 4. Complex Conditions

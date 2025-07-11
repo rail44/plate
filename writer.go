@@ -17,8 +17,8 @@ type WriteOptions struct {
 	Format bool
 }
 
-// DefaultWriteOptions returns default write options
-func DefaultWriteOptions() WriteOptions {
+// defaultWriteOptions returns default write options
+func defaultWriteOptions() WriteOptions {
 	return WriteOptions{
 		BaseDir:   ".",
 		Overwrite: true,
@@ -26,8 +26,8 @@ func DefaultWriteOptions() WriteOptions {
 	}
 }
 
-// WriteFiles writes the generated files to disk
-func WriteFiles(files map[string]string, opts WriteOptions) error {
+// writeFiles writes the generated files to disk
+func writeFiles(files map[string]string, opts WriteOptions) error {
 	for path, content := range files {
 		if err := writeFile(filepath.Join(opts.BaseDir, path), content, opts); err != nil {
 			return fmt.Errorf("failed to write %s: %w", path, err)
@@ -75,11 +75,11 @@ type GeneratedFiles struct {
 
 // WriteToDirectory writes all generated files to the specified directory
 func (gf GeneratedFiles) WriteToDirectory(dir string) error {
-	return gf.WriteToDirectoryWithOptions(dir, DefaultWriteOptions())
+	return gf.WriteToDirectoryWithOptions(dir, defaultWriteOptions())
 }
 
 // WriteToDirectoryWithOptions writes all generated files with custom options
 func (gf GeneratedFiles) WriteToDirectoryWithOptions(dir string, opts WriteOptions) error {
 	opts.BaseDir = dir
-	return WriteFiles(gf.Files, opts)
+	return writeFiles(gf.Files, opts)
 }

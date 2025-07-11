@@ -190,11 +190,11 @@ func (c Column[T, V]) In(values ...V) ExprOption[T] {
 	}
 }
 
-// IsNull creates an IS NULL condition
-func (c Column[T, V]) IsNull() ExprOption[T] {
+// isNullExpr creates an IS NULL or IS NOT NULL expression
+func (c Column[T, V]) isNullExpr(not bool) ExprOption[T] {
 	return func(s *State, expr *ast.Expr) {
 		*expr = &ast.IsNullExpr{
-			Not: false,
+			Not: not,
 			Left: &ast.Path{
 				Idents: []*ast.Ident{
 					{Name: s.CurrentAlias()},
@@ -205,17 +205,12 @@ func (c Column[T, V]) IsNull() ExprOption[T] {
 	}
 }
 
+// IsNull creates an IS NULL condition
+func (c Column[T, V]) IsNull() ExprOption[T] {
+	return c.isNullExpr(false)
+}
+
 // IsNotNull creates an IS NOT NULL condition
 func (c Column[T, V]) IsNotNull() ExprOption[T] {
-	return func(s *State, expr *ast.Expr) {
-		*expr = &ast.IsNullExpr{
-			Not: true,
-			Left: &ast.Path{
-				Idents: []*ast.Ident{
-					{Name: s.CurrentAlias()},
-					{Name: c.Name},
-				},
-			},
-		}
-	}
+	return c.isNullExpr(true)
 }

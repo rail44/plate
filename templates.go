@@ -11,8 +11,8 @@ type templateData struct {
 	Tables      []tableTemplateData
 	TypeName    string
 	TableName   string
-	Columns     []ColumnInfo
-	Relations   []GeneratedRelation
+	Columns     []columnInfo
+	Relations   []generatedRelation
 	Imports     []string
 }
 

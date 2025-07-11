@@ -98,7 +98,7 @@ func (ctx *subqueryContext) buildJunctionJoin() *ast.Join {
 // buildBasicSubquery creates a basic subquery with FROM and WHERE
 func (ctx *subqueryContext) buildBasicSubquery(selectItems []ast.SelectItem) *ast.Query {
 	whereExpr := ctx.buildDirectRelationshipWhere()
-	
+
 	query := &ast.Query{
 		Query: &ast.Select{
 			Results: selectItems,

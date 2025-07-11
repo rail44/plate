@@ -5,8 +5,8 @@ import (
 	"reflect"
 )
 
-// ColumnInfo represents extracted column information
-type ColumnInfo struct {
+// columnInfo represents extracted column information
+type columnInfo struct {
 	Name        string // Field name (e.g., "ID", "UserID")
 	GoType      string // Go type string (e.g., "string", "int64")
 	SpannerType string // Spanner type from tag (e.g., "STRING", "INT64")
@@ -14,13 +14,13 @@ type ColumnInfo struct {
 }
 
 // extractColumns extracts column information from a model using reflection
-func extractColumns(model interface{}) []ColumnInfo {
+func extractColumns(model interface{}) []columnInfo {
 	t := reflect.TypeOf(model)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
 
-	var columns []ColumnInfo
+	var columns []columnInfo
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
@@ -44,7 +44,7 @@ func extractColumns(model interface{}) []ColumnInfo {
 			spannerType = inferSpannerType(field.Type)
 		}
 
-		columns = append(columns, ColumnInfo{
+		columns = append(columns, columnInfo{
 			Name:        field.Name,
 			GoType:      getGoTypeString(field.Type),
 			SpannerType: spannerType,

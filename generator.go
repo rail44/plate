@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 
+	"github.com/rail44/plate/query"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -41,11 +42,6 @@ type Relation struct {
 	ReverseName string // Optional: Name for the reverse HasMany relation (e.g., "Posts")
 }
 
-// KeyPair represents a pair of keys for relationships
-type KeyPair struct {
-	From string // Key from the source table
-	To   string // Key in the target table
-}
 
 // Generator is responsible for generating query builder code
 type Generator struct {
@@ -152,8 +148,8 @@ func (g *Generator) buildTableMap() map[string]TableSchema {
 }
 
 // buildRelationMap builds a map of relations including derived ones
-func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
-	relations := make(map[string][]GeneratedRelation)
+func (g *Generator) buildRelationMap() map[string][]generatedRelation {
+	relations := make(map[string][]generatedRelation)
 
 	// 1. Process BelongsTo relations from regular tables
 	for _, tc := range g.config.Tables {
@@ -161,20 +157,20 @@ func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
 
 		for _, rel := range tc.Relations {
 			// Add BelongsTo relation
-			relations[typeName] = append(relations[typeName], GeneratedRelation{
+			relations[typeName] = append(relations[typeName], generatedRelation{
 				Name:   rel.Name,
 				Type:   "belongs_to",
 				Target: rel.Target,
-				Keys:   KeyPair{From: rel.From, To: rel.To},
+				Keys:   query.KeyPair{From: rel.From, To: rel.To},
 			})
 
 			// Generate reverse HasMany relation if ReverseName is specified
 			if rel.ReverseName != "" {
-				relations[rel.Target] = append(relations[rel.Target], GeneratedRelation{
+				relations[rel.Target] = append(relations[rel.Target], generatedRelation{
 					Name:   rel.ReverseName,
 					Type:   "has_many",
 					Target: typeName,
-					Keys:   KeyPair{From: rel.To, To: rel.From},
+					Keys:   query.KeyPair{From: rel.To, To: rel.From},
 				})
 			}
 		}
@@ -192,25 +188,25 @@ func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
 
 		// Generate ManyToMany from first table to second
 		if rel1.ReverseName != "" {
-			relations[rel1.Target] = append(relations[rel1.Target], GeneratedRelation{
+			relations[rel1.Target] = append(relations[rel1.Target], generatedRelation{
 				Name:          rel1.ReverseName,
 				Type:          "many_to_many",
 				Target:        rel2.Target,
-				Keys:          KeyPair{From: rel1.To, To: rel1.From},
+				Keys:          query.KeyPair{From: rel1.To, To: rel1.From},
 				JunctionTable: junctionName,
-				JunctionKeys:  KeyPair{From: rel2.From, To: rel2.To},
+				JunctionKeys:  query.KeyPair{From: rel2.From, To: rel2.To},
 			})
 		}
 
 		// Generate ManyToMany from second table to first
 		if rel2.ReverseName != "" {
-			relations[rel2.Target] = append(relations[rel2.Target], GeneratedRelation{
+			relations[rel2.Target] = append(relations[rel2.Target], generatedRelation{
 				Name:          rel2.ReverseName,
 				Type:          "many_to_many",
 				Target:        rel1.Target,
-				Keys:          KeyPair{From: rel2.To, To: rel2.From},
+				Keys:          query.KeyPair{From: rel2.To, To: rel2.From},
 				JunctionTable: junctionName,
-				JunctionKeys:  KeyPair{From: rel1.From, To: rel1.To},
+				JunctionKeys:  query.KeyPair{From: rel1.From, To: rel1.To},
 			})
 		}
 	}
@@ -218,14 +214,14 @@ func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
 	return relations
 }
 
-// GeneratedRelation represents a relation that will be generated
-type GeneratedRelation struct {
+// generatedRelation represents a relation that will be generated
+type generatedRelation struct {
 	Name          string
 	Type          string // "belongs_to", "has_many", "many_to_many"
 	Target        string
-	Keys          KeyPair
+	Keys          query.KeyPair
 	JunctionTable string  // For many_to_many
-	JunctionKeys  KeyPair // For many_to_many
+	JunctionKeys  query.KeyPair // For many_to_many
 }
 
 // generateTablesPackage generates the tables package containing all table definitions
@@ -258,7 +254,7 @@ func (g *Generator) generateTablesPackage(tableMap map[string]TableSchema) (stri
 }
 
 // generateQueryBuilder generates a query builder package for a specific table
-func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]TableSchema, relationMap map[string][]GeneratedRelation) (string, error) {
+func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]TableSchema, relationMap map[string][]generatedRelation) (string, error) {
 	tmpl, err := getTemplates()
 	if err != nil {
 		return "", err

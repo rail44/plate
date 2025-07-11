@@ -8,14 +8,14 @@ Plate provides strongly-typed query builders with compile-time safety for SQL qu
 
 ```go
 // Type-safe query construction with fluent Column API
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.Name().Like("John%"),
     user.Email().Ne("admin@example.com"),
     user.ID().Between("100", "200"),
     user.OrderBy(user.Name(), ast.DirectionAsc),
     user.Limit(10),
 )
-// sql: SELECT * FROM user WHERE user.name LIKE @p0 AND user.email != @p1 AND user.id BETWEEN @p2 AND @p3 ORDER BY user.name ASC LIMIT 10
+// sql: SELECT user.* FROM user WHERE user.name LIKE @p0 AND user.email != @p1 AND user.id BETWEEN @p2 AND @p3 ORDER BY user.name ASC LIMIT 10
 // params: []any{"John%", "admin@example.com", "100", "200"}
 ```
 
@@ -48,10 +48,10 @@ user.ID().Between("1", "100")    // Correct string type matching
 - **NULL Checking**: `IsNull()`, `IsNotNull()`
 
 ### 🔗 **Relationship Support**
-- **One-to-Many**: `user.Posts()` with optional filtering
-- **Many-to-Many**: `post.Tags()` through junction tables
-- **Belongs-To**: `post.Author()` with INNER JOIN by default
-- **JOIN Type Control**: `WithInnerJoin()` to override default JOIN types
+- **One-to-Many**: `user.WithPosts()` loads posts as nested array
+- **Many-to-Many**: `post.WithTags()` through junction tables
+- **Belongs-To**: `post.WithAuthor()` loads single related record
+- **Filtering**: `user.WherePosts()` filters parent by child conditions (WHERE EXISTS)
 
 ### 🚀 **Code Generation**
 - **Automatic Query Builder Generation**: Generate type-safe query builders from table schemas
@@ -67,11 +67,12 @@ user.ID().Between("1", "100")    // Correct string type matching
 
 ```go
 // Column operations: method chaining
-condition := user.Name().Like("J%").And(user.ID().Gt("10"))
+condition := user.Name().Like("J%")
 
-// Query structure: functional options
-sql, params := query.Select[tables.User](
+// Query structure: functional options  
+sql, params := user.Select(
     condition,
+    user.ID().Gt("10"),  // Multiple conditions are AND-ed
     user.OrderBy(user.Name(), ast.DirectionAsc),
     user.Limit(10),
 )
@@ -83,12 +84,12 @@ sql, params := query.Select[tables.User](
 
 ```go
 // Simple condition
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.Email().Eq("john@example.com"),
 )
 
 // Multiple conditions (implicit AND)
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.Name().Like("J%"),
     user.Email().IsNotNull(),
     user.ID().Gt("100"),
@@ -96,7 +97,7 @@ sql, params := query.Select[tables.User](
 )
 
 // OR conditions
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.Or(
         user.Name().Eq("John"),
         user.Name().Eq("Jane"),
@@ -106,7 +107,7 @@ sql, params := query.Select[tables.User](
 )
 
 // Range and list queries
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.ID().Between("100", "200"),
     user.Name().In("John", "Jane", "Bob"),
     user.Email().IsNotNull(),
@@ -117,7 +118,7 @@ sql, params := query.Select[tables.User](
 
 ```go
 // Complex boolean: (a AND b) OR (c AND d)
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.Or(
         user.And(
             user.Name().Eq("John"),
@@ -131,7 +132,7 @@ sql, params := query.Select[tables.User](
 )
 
 // Negation with NOT
-sql, params := query.Select[tables.User](
+sql, params := user.Select(
     user.Not(user.Name().Like("Admin%")),  // NOT (name LIKE 'Admin%')
     user.Not(user.Or(                      // NOT (name = 'John' OR name = 'Jane')
         user.Name().Eq("John"),
@@ -144,54 +145,52 @@ sql, params := query.Select[tables.User](
 
 ```go
 // One-to-Many: Users with their posts
-sql, params := query.Select[tables.User](
-    user.Posts(),  // LEFT OUTER JOIN by default
+sql, params := user.Select(
+    user.WithPosts(),  // Adds posts as nested array
     user.OrderBy(user.Name(), ast.DirectionAsc),
 )
 
-// Filtered relationships
-sql, params := query.Select[tables.User](
-    user.Posts(post.Title().Like("%important%")),
+// Filtered relationships  
+sql, params := user.Select(
+    user.WithPosts(post.Title().Like("%important%")),
+    user.Name().Ne("Admin"),
+)
+
+// Filter users by post conditions (WHERE EXISTS)
+sql, params := user.Select(
+    user.WherePosts(post.Title().Like("%important%")),
     user.Name().Ne("Admin"),
 )
 
 // Many-to-Many: Posts with specific tags
-sql, params := query.Select[tables.Post](
-    post.Tags(tag.Name().Eq("Go")),
+sql, params := post.Select(
+    post.WithTags(tag.Name().Eq("Go")),
     post.Title().Like("%tutorial%"),
 )
 
 // Belongs-To: Posts with author information
-sql, params := query.Select[tables.Post](
-    post.Author(user.Email().Like("%@company.com")),
+sql, params := post.Select(
+    post.WithAuthor(user.Email().Like("%@company.com")),
     post.Title().Like("Announcement:%"),
-)
-
-// Override JOIN type
-sql, params := query.Select[tables.User](
-    user.Posts(
-        post.Title().Like("%important%"),
-        post.WithInnerJoin(),  // Use INNER JOIN instead of LEFT OUTER JOIN
-    ),
 )
 ```
 
 ### Multi-level JOINs
 
 ```go
-// User → Posts → Tags (3-level JOIN)
-sql, params := query.Select[tables.User](
+// User → Posts (with tags loaded)
+sql, params := user.Select(
     user.Email().Eq("john@example.com"),
-    user.Posts(
-        post.Tags(),
+    user.WithPosts(
+        post.WithTags(),
         post.OrderBy(post.Title(), ast.DirectionDesc),
     ),
 )
 
-// Complex filtered multi-level JOIN
-sql, params := query.Select[tables.User](
-    user.Posts(
-        post.Tags(tag.Name().Eq("Go")),
+// Complex filtered relationships
+sql, params := user.Select(
+    user.WithPosts(
+        post.WithTags(tag.Name().Eq("Go")),
         post.Title().Like("%tutorial%"),
     ),
     user.OrderBy(user.Name(), ast.DirectionAsc),
