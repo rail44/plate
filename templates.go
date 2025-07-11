@@ -83,35 +83,72 @@ func WithInnerJoin() types.QueryOption[tables.{{.TypeName}}] {
 }
 
 {{range .Relations}}
-{{if eq .Type "belongs_to"}}// {{.Name}} joins with {{.Target | toSnakeCase}} table (belongs_to relationship)
-func {{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
-	return query.DirectJoin[tables.{{$.TypeName}}](
+{{if eq .Type "belongs_to"}}// With{{.Name}} fetches related {{.Target}} as a nested struct
+func With{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
+	return query.WithSubquery[tables.{{$.TypeName}}, tables.{{.Target}}](
 		"{{.Name | toSnakeCase}}",
 		"{{.Target | toSnakeCase}}",
 		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
-		ast.InnerJoin,
+		false, // not an array
+		"",    // no junction table
+		query.KeyPair{},
 		opts...,
 	)
 }
-{{else if eq .Type "has_many"}}// {{.Name}} joins with {{.Target | toSnakeCase}} table (has_many relationship)
-func {{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
-	return query.DirectJoin[tables.{{$.TypeName}}](
+
+// Where{{.Name}} filters {{$.TypeName}} by conditions on its {{.Name}}
+func Where{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.ExprOption[tables.{{$.TypeName}}] {
+	return query.WhereExists[tables.{{$.TypeName}}, tables.{{.Target}}](
+		"{{.Target | toSnakeCase}}",
+		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
+		"",    // no junction table
+		query.KeyPair{},
+		opts...,
+	)
+}
+{{else if eq .Type "has_many"}}// With{{.Name}} fetches related {{.Target}} as a nested array of structs
+func With{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
+	return query.WithSubquery[tables.{{$.TypeName}}, tables.{{.Target}}](
 		"{{.Name | toSnakeCase}}",
 		"{{.Target | toSnakeCase}}",
 		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
-		ast.LeftOuterJoin,
+		true,  // array
+		"",    // no junction table
+		query.KeyPair{},
 		opts...,
 	)
 }
-{{else if eq .Type "many_to_many"}}// {{.Name}} joins with {{.Target | toSnakeCase}} table through {{.JunctionTable | toSnakeCase}} junction table (many_to_many relationship)
-func {{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
-	return query.JunctionJoin[tables.{{$.TypeName}}](
+
+// Where{{.Name}} filters {{$.TypeName}} by conditions on its {{.Name}}
+func Where{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.ExprOption[tables.{{$.TypeName}}] {
+	return query.WhereExists[tables.{{$.TypeName}}, tables.{{.Target}}](
+		"{{.Target | toSnakeCase}}",
+		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
+		"",    // no junction table
+		query.KeyPair{},
+		opts...,
+	)
+}
+{{else if eq .Type "many_to_many"}}// With{{.Name}} fetches related {{.Target}} through {{.JunctionTable | toSnakeCase}} as a nested array of structs
+func With{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.QueryOption[tables.{{$.TypeName}}] {
+	return query.WithSubquery[tables.{{$.TypeName}}, tables.{{.Target}}](
 		"{{.Name | toSnakeCase}}",
+		"{{.Target | toSnakeCase}}",
+		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
+		true,  // array
 		"{{.JunctionTable | toSnakeCase}}",
-		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
-		"{{.Target | toSnakeCase}}",
 		query.KeyPair{From: "{{.JunctionKeys.From | toSnakeCase}}", To: "{{.JunctionKeys.To | toSnakeCase}}"},
-		ast.LeftOuterJoin,
+		opts...,
+	)
+}
+
+// Where{{.Name}} filters {{$.TypeName}} by conditions on its {{.Name}}
+func Where{{.Name}}(opts ...types.Option[tables.{{.Target}}]) types.ExprOption[tables.{{$.TypeName}}] {
+	return query.WhereExists[tables.{{$.TypeName}}, tables.{{.Target}}](
+		"{{.Target | toSnakeCase}}",
+		query.KeyPair{From: "{{.Keys.From | toSnakeCase}}", To: "{{.Keys.To | toSnakeCase}}"},
+		"{{.JunctionTable | toSnakeCase}}",
+		query.KeyPair{From: "{{.JunctionKeys.From | toSnakeCase}}", To: "{{.JunctionKeys.To | toSnakeCase}}"},
 		opts...,
 	)
 }
@@ -123,19 +160,19 @@ func getTemplates() (*template.Template, error) {
 	funcMap := template.FuncMap{
 		"toSnakeCase": toSnakeCase,
 	}
-	
+
 	tmpl := template.New("generator").Funcs(funcMap)
-	
+
 	// Parse tables template
 	if _, err := tmpl.New("tables").Parse(tablesTemplate); err != nil {
 		return nil, err
 	}
-	
+
 	// Parse query builder template
 	if _, err := tmpl.New("queryBuilder").Parse(queryBuilderTemplate); err != nil {
 		return nil, err
 	}
-	
+
 	return tmpl, nil
 }
 

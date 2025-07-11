@@ -62,13 +62,26 @@ func WithInnerJoin() types.QueryOption[tables.User] {
 	return query.WithInnerJoinOption[tables.User]()
 }
 
-// Posts joins with post table (has_many relationship)
-func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
-	return query.DirectJoin[tables.User](
+// WithPosts fetches related Post as a nested array of structs
+func WithPosts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
+	return query.WithSubquery[tables.User, tables.Post](
 		"posts",
 		"post",
 		query.KeyPair{From: "id", To: "user_id"},
-		ast.LeftOuterJoin,
+		true, // array
+		"",   // no junction table
+		query.KeyPair{},
+		opts...,
+	)
+}
+
+// WherePosts filters User by conditions on its Posts
+func WherePosts(opts ...types.Option[tables.Post]) types.ExprOption[tables.User] {
+	return query.WhereExists[tables.User, tables.Post](
+		"post",
+		query.KeyPair{From: "id", To: "user_id"},
+		"", // no junction table
+		query.KeyPair{},
 		opts...,
 	)
 }

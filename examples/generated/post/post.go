@@ -66,26 +66,50 @@ func WithInnerJoin() types.QueryOption[tables.Post] {
 	return query.WithInnerJoinOption[tables.Post]()
 }
 
-// Author joins with user table (belongs_to relationship)
-func Author(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
-	return query.DirectJoin[tables.Post](
+// WithAuthor fetches related User as a nested struct
+func WithAuthor(opts ...types.Option[tables.User]) types.QueryOption[tables.Post] {
+	return query.WithSubquery[tables.Post, tables.User](
 		"author",
 		"user",
 		query.KeyPair{From: "user_id", To: "id"},
-		ast.InnerJoin,
+		false, // not an array
+		"",    // no junction table
+		query.KeyPair{},
 		opts...,
 	)
 }
 
-// Tags joins with tag table through post_tag junction table (many_to_many relationship)
-func Tags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
-	return query.JunctionJoin[tables.Post](
+// WhereAuthor filters Post by conditions on its Author
+func WhereAuthor(opts ...types.Option[tables.User]) types.ExprOption[tables.Post] {
+	return query.WhereExists[tables.Post, tables.User](
+		"user",
+		query.KeyPair{From: "user_id", To: "id"},
+		"", // no junction table
+		query.KeyPair{},
+		opts...,
+	)
+}
+
+// WithTags fetches related Tag through post_tag as a nested array of structs
+func WithTags(opts ...types.Option[tables.Tag]) types.QueryOption[tables.Post] {
+	return query.WithSubquery[tables.Post, tables.Tag](
 		"tags",
-		"post_tag",
-		query.KeyPair{From: "id", To: "post_id"},
 		"tag",
+		query.KeyPair{From: "id", To: "post_id"},
+		true, // array
+		"post_tag",
 		query.KeyPair{From: "tag_id", To: "id"},
-		ast.LeftOuterJoin,
+		opts...,
+	)
+}
+
+// WhereTags filters Post by conditions on its Tags
+func WhereTags(opts ...types.Option[tables.Tag]) types.ExprOption[tables.Post] {
+	return query.WhereExists[tables.Post, tables.Tag](
+		"tag",
+		query.KeyPair{From: "id", To: "post_id"},
+		"post_tag",
+		query.KeyPair{From: "tag_id", To: "id"},
 		opts...,
 	)
 }

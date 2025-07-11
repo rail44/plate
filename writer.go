@@ -43,12 +43,12 @@ func writeFile(path, content string, opts WriteOptions) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
-	
+
 	// Check if file exists and whether we should overwrite
 	if _, err := os.Stat(path); err == nil && !opts.Overwrite {
 		return fmt.Errorf("file already exists: %s", path)
 	}
-	
+
 	// Format code if requested
 	if opts.Format && filepath.Ext(path) == ".go" {
 		formatted, err := format.Source([]byte(content))
@@ -59,12 +59,12 @@ func writeFile(path, content string, opts WriteOptions) error {
 			content = string(formatted)
 		}
 	}
-	
+
 	// Write file
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
-	
+
 	return nil
 }
 

@@ -19,7 +19,7 @@ func toSnakeCase(s string) string {
 				// This handles cases like "UserID" -> "user_id" (not "user_i_d")
 				prevIsLower := i > 0 && unicode.IsLower(rune(s[i-1]))
 				nextIsLower := i < len(s)-1 && unicode.IsLower(rune(s[i+1]))
-				
+
 				if prevIsLower || nextIsLower {
 					result.WriteByte('_')
 				}

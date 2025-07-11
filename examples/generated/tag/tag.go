@@ -53,15 +53,26 @@ func WithInnerJoin() types.QueryOption[tables.Tag] {
 	return query.WithInnerJoinOption[tables.Tag]()
 }
 
-// Posts joins with post table through post_tag junction table (many_to_many relationship)
-func Posts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
-	return query.JunctionJoin[tables.Tag](
+// WithPosts fetches related Post through post_tag as a nested array of structs
+func WithPosts(opts ...types.Option[tables.Post]) types.QueryOption[tables.Tag] {
+	return query.WithSubquery[tables.Tag, tables.Post](
 		"posts",
-		"post_tag",
-		query.KeyPair{From: "id", To: "tag_id"},
 		"post",
+		query.KeyPair{From: "id", To: "tag_id"},
+		true, // array
+		"post_tag",
 		query.KeyPair{From: "post_id", To: "id"},
-		ast.LeftOuterJoin,
+		opts...,
+	)
+}
+
+// WherePosts filters Tag by conditions on its Posts
+func WherePosts(opts ...types.Option[tables.Post]) types.ExprOption[tables.Tag] {
+	return query.WhereExists[tables.Tag, tables.Post](
+		"post",
+		query.KeyPair{From: "id", To: "tag_id"},
+		"post_tag",
+		query.KeyPair{From: "post_id", To: "id"},
 		opts...,
 	)
 }

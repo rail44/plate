@@ -9,7 +9,14 @@ import (
 type State struct {
 	Tables           map[string]struct{}
 	Params           []any
-	RelationshipPath []string // Track relationship path for alias generation
+	RelationshipPath []string         // Track relationship path for alias generation
+	SubqueryColumns  []SubqueryColumn // Track subqueries to add to SELECT
+}
+
+// SubqueryColumn represents a column that will be added to SELECT as a subquery
+type SubqueryColumn struct {
+	Alias    string
+	Subquery ast.Expr
 }
 
 // registerRelationship registers a relationship and generates an alias

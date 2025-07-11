@@ -22,7 +22,7 @@ func TestUserQueries(t *testing.T) {
 			query: func() (string, []any) {
 				return user.Select()
 			},
-			wantSQL:  "SELECT * FROM user",
+			wantSQL:  "SELECT user.* FROM user",
 			wantArgs: nil,
 		},
 		{
@@ -32,7 +32,7 @@ func TestUserQueries(t *testing.T) {
 					user.Name().Eq("John"),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE user.name = @p0",
+			wantSQL:  "SELECT user.* FROM user WHERE user.name = @p0",
 			wantArgs: []any{"John"},
 		},
 		{
@@ -42,7 +42,7 @@ func TestUserQueries(t *testing.T) {
 					user.Limit(10),
 				)
 			},
-			wantSQL:  "SELECT * FROM user LIMIT 10",
+			wantSQL:  "SELECT user.* FROM user LIMIT 10",
 			wantArgs: nil,
 		},
 		{
@@ -52,19 +52,31 @@ func TestUserQueries(t *testing.T) {
 					user.OrderBy(user.CreatedAt(), ast.DirectionDesc),
 				)
 			},
-			wantSQL:  "SELECT * FROM user ORDER BY user.created_at DESC",
+			wantSQL:  "SELECT user.* FROM user ORDER BY user.created_at DESC",
 			wantArgs: nil,
 		},
 		{
-			name: "select with has_many join",
+			name: "select with has_many subquery",
 			query: func() (string, []any) {
 				return user.Select(
-					user.Posts(
+					user.WithPosts(
 						post.Title().Eq("Hello World"),
 					),
 				)
 			},
-			wantSQL:  "SELECT * FROM user LEFT OUTER JOIN post AS posts ON user.id = posts.user_id WHERE posts.title = @p0",
+			wantSQL:  "SELECT user.*, ((SELECT ARRAY_AGG(((SELECT AS STRUCT * FROM post WHERE post.user_id = user.id AND post.title = @p0))))) AS posts FROM user",
+			wantArgs: []any{"Hello World"},
+		},
+		{
+			name: "select filtered by has_many",
+			query: func() (string, []any) {
+				return user.Select(
+					user.WherePosts(
+						post.Title().Eq("Hello World"),
+					),
+				)
+			},
+			wantSQL:  "SELECT user.* FROM user WHERE EXISTS((SELECT 1 FROM post WHERE post.user_id = user.id AND post.title = @p0))",
 			wantArgs: []any{"Hello World"},
 		},
 	}
@@ -96,27 +108,27 @@ func TestPostQueries(t *testing.T) {
 		wantArgs []any
 	}{
 		{
-			name: "select with belongs_to join",
+			name: "select with belongs_to subquery",
 			query: func() (string, []any) {
 				return post.Select(
-					post.Author(
+					post.WithAuthor(
 						user.Name().Eq("Alice"),
 					),
 				)
 			},
-			wantSQL:  "SELECT * FROM post INNER JOIN user AS author ON post.user_id = author.id WHERE author.name = @p0",
+			wantSQL:  "SELECT post.*, ((SELECT AS STRUCT * FROM user WHERE user.id = post.user_id AND user.name = @p0)) AS author FROM post",
 			wantArgs: []any{"Alice"},
 		},
 		{
-			name: "select with many_to_many join",
+			name: "select with many_to_many subquery",
 			query: func() (string, []any) {
 				return post.Select(
-					post.Tags(
+					post.WithTags(
 						tag.Name().Eq("golang"),
 					),
 				)
 			},
-			wantSQL:  "SELECT * FROM post LEFT OUTER JOIN post_tag AS post_post_tag ON post.id = post_post_tag.post_id LEFT OUTER JOIN tag AS tags ON post_post_tag.tag_id = tags.id WHERE tags.name = @p0",
+			wantSQL:  "SELECT post.*, ((SELECT ARRAY_AGG(((SELECT AS STRUCT * FROM tag WHERE tag.id IN (SELECT post_tag.tag_id FROM post_tag WHERE post_tag.post_id = post.id) AND tag.name = @p0))))) AS tags FROM post",
 			wantArgs: []any{"golang"},
 		},
 		{
@@ -124,14 +136,14 @@ func TestPostQueries(t *testing.T) {
 			query: func() (string, []any) {
 				return post.Select(
 					post.Title().Like("%tutorial%"),
-					post.Author(
+					post.WhereAuthor(
 						user.Email().Eq("author@example.com"),
 					),
 					post.OrderBy(post.CreatedAt(), ast.DirectionDesc),
 					post.Limit(5),
 				)
 			},
-			wantSQL:  "SELECT * FROM post INNER JOIN user AS author ON post.user_id = author.id WHERE post.title LIKE @p0 AND author.email = @p1 ORDER BY post.created_at DESC LIMIT 5",
+			wantSQL:  "SELECT post.* FROM post WHERE post.title LIKE @p0 AND EXISTS((SELECT 1 FROM user WHERE user.id = post.user_id AND user.email = @p1)) ORDER BY post.created_at DESC LIMIT 5",
 			wantArgs: []any{"%tutorial%", "author@example.com"},
 		},
 	}
@@ -172,7 +184,7 @@ func TestLogicalOperators(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE (user.name = @p0 OR user.name = @p1)",
+			wantSQL:  "SELECT user.* FROM user WHERE (user.name = @p0 OR user.name = @p1)",
 			wantArgs: []any{"Alice", "Bob"},
 		},
 		{
@@ -185,7 +197,7 @@ func TestLogicalOperators(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE (user.name LIKE @p0 AND user.email LIKE @p1)",
+			wantSQL:  "SELECT user.* FROM user WHERE (user.name LIKE @p0 AND user.email LIKE @p1)",
 			wantArgs: []any{"A%", "%@example.com"},
 		},
 		{
@@ -195,7 +207,7 @@ func TestLogicalOperators(t *testing.T) {
 					user.Not(user.Name().Eq("Admin")),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE NOT (user.name = @p0)",
+			wantSQL:  "SELECT user.* FROM user WHERE NOT (user.name = @p0)",
 			wantArgs: []any{"Admin"},
 		},
 		{
@@ -208,7 +220,7 @@ func TestLogicalOperators(t *testing.T) {
 					)),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE NOT (user.name = @p0 OR user.name = @p1)",
+			wantSQL:  "SELECT user.* FROM user WHERE NOT (user.name = @p0 OR user.name = @p1)",
 			wantArgs: []any{"Admin", "Root"},
 		},
 		{
@@ -221,7 +233,7 @@ func TestLogicalOperators(t *testing.T) {
 					)),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE NOT (user.name = @p0 AND user.email LIKE @p1)",
+			wantSQL:  "SELECT user.* FROM user WHERE NOT (user.name = @p0 AND user.email LIKE @p1)",
 			wantArgs: []any{"Alice", "%@admin.com"},
 		},
 		{
@@ -234,7 +246,7 @@ func TestLogicalOperators(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE (NOT (user.name = @p0) AND user.email LIKE @p1)",
+			wantSQL:  "SELECT user.* FROM user WHERE (NOT (user.name = @p0) AND user.email LIKE @p1)",
 			wantArgs: []any{"Admin", "%@example.com"},
 		},
 		{
@@ -245,7 +257,7 @@ func TestLogicalOperators(t *testing.T) {
 					user.Not(user.CreatedAt().Gt(testTime)),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE NOT (user.created_at > @p0)",
+			wantSQL:  "SELECT user.* FROM user WHERE NOT (user.created_at > @p0)",
 			wantArgs: []any{time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
 		},
 		{
@@ -258,7 +270,7 @@ func TestLogicalOperators(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT * FROM user WHERE (NOT (user.name = @p0) AND NOT (user.name = @p1))",
+			wantSQL:  "SELECT user.* FROM user WHERE (NOT (user.name = @p0) AND NOT (user.name = @p1))",
 			wantArgs: []any{"Admin", "Root"},
 		},
 	}

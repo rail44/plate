@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
-	
+
 	"golang.org/x/tools/go/packages"
 )
 
@@ -49,7 +49,7 @@ type KeyPair struct {
 
 // Generator is responsible for generating query builder code
 type Generator struct {
-	config GeneratorConfig
+	config    GeneratorConfig
 	outputDir string
 }
 
@@ -86,7 +86,7 @@ func (g *Generator) Generate(config GeneratorConfig, outputDir string) (Generate
 	for _, tc := range g.config.Tables {
 		typeName := g.getTypeName(tc.Schema)
 		packageName := g.toPackageName(typeName)
-		
+
 		code, err := g.generateQueryBuilder(tc, tableMap, relationMap)
 		if err != nil {
 			return GeneratedFiles{}, fmt.Errorf("failed to generate query builder for %s: %w", typeName, err)
@@ -101,7 +101,7 @@ func (g *Generator) Generate(config GeneratorConfig, outputDir string) (Generate
 func (g *Generator) validateConfig() error {
 	// Check for duplicate table names
 	seen := make(map[string]bool)
-	
+
 	for _, tc := range g.config.Tables {
 		name := g.getTypeName(tc.Schema)
 		if seen[name] {
@@ -137,28 +137,28 @@ func (g *Generator) toPackageName(typeName string) string {
 // buildTableMap creates a map of type names to table schemas
 func (g *Generator) buildTableMap() map[string]TableSchema {
 	m := make(map[string]TableSchema)
-	
+
 	for _, tc := range g.config.Tables {
 		name := g.getTypeName(tc.Schema)
 		m[name] = tc.Schema
 	}
-	
+
 	for _, jc := range g.config.Junctions {
 		name := g.getTypeName(jc.Schema)
 		m[name] = jc.Schema
 	}
-	
+
 	return m
 }
 
 // buildRelationMap builds a map of relations including derived ones
 func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
 	relations := make(map[string][]GeneratedRelation)
-	
+
 	// 1. Process BelongsTo relations from regular tables
 	for _, tc := range g.config.Tables {
 		typeName := g.getTypeName(tc.Schema)
-		
+
 		for _, rel := range tc.Relations {
 			// Add BelongsTo relation
 			relations[typeName] = append(relations[typeName], GeneratedRelation{
@@ -167,7 +167,7 @@ func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
 				Target: rel.Target,
 				Keys:   KeyPair{From: rel.From, To: rel.To},
 			})
-			
+
 			// Generate reverse HasMany relation if ReverseName is specified
 			if rel.ReverseName != "" {
 				relations[rel.Target] = append(relations[rel.Target], GeneratedRelation{
@@ -179,17 +179,17 @@ func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
 			}
 		}
 	}
-	
+
 	// 2. Process junction tables to generate ManyToMany relations
 	for _, jc := range g.config.Junctions {
 		if len(jc.Relations) != 2 {
 			continue // Skip invalid junction tables
 		}
-		
+
 		junctionName := g.getTypeName(jc.Schema)
 		rel1 := jc.Relations[0]
 		rel2 := jc.Relations[1]
-		
+
 		// Generate ManyToMany from first table to second
 		if rel1.ReverseName != "" {
 			relations[rel1.Target] = append(relations[rel1.Target], GeneratedRelation{
@@ -201,7 +201,7 @@ func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
 				JunctionKeys:  KeyPair{From: rel2.From, To: rel2.To},
 			})
 		}
-		
+
 		// Generate ManyToMany from second table to first
 		if rel2.ReverseName != "" {
 			relations[rel2.Target] = append(relations[rel2.Target], GeneratedRelation{
@@ -214,10 +214,9 @@ func (g *Generator) buildRelationMap() map[string][]GeneratedRelation {
 			})
 		}
 	}
-	
+
 	return relations
 }
-
 
 // GeneratedRelation represents a relation that will be generated
 type GeneratedRelation struct {
@@ -225,7 +224,7 @@ type GeneratedRelation struct {
 	Type          string // "belongs_to", "has_many", "many_to_many"
 	Target        string
 	Keys          KeyPair
-	JunctionTable string // For many_to_many
+	JunctionTable string  // For many_to_many
 	JunctionKeys  KeyPair // For many_to_many
 }
 
@@ -235,7 +234,7 @@ func (g *Generator) generateTablesPackage(tableMap map[string]TableSchema) (stri
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Prepare table data
 	var tables []tableTemplateData
 	for typeName, schema := range tableMap {
@@ -250,11 +249,11 @@ func (g *Generator) generateTablesPackage(tableMap map[string]TableSchema) (stri
 			}
 		}
 	}
-	
+
 	data := templateData{
 		Tables: tables,
 	}
-	
+
 	return renderTemplate(tmpl, "tables", data)
 }
 
@@ -264,24 +263,24 @@ func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]Tab
 	if err != nil {
 		return "", err
 	}
-	
+
 	typeName := g.getTypeName(tc.Schema)
 	packageName := g.toPackageName(typeName)
-	
+
 	// Extract columns
 	columns := extractColumns(tc.Schema.Model)
-	
+
 	// Get relations for this table
 	relations := relationMap[typeName]
-	
+
 	// Determine imports
 	imports := []string{
 		"github.com/cloudspannerecosystem/memefish/ast",
-		g.getBaseImportPath() + "/query",
+		"github.com/rail44/plate/query",
 		g.getTablesImportPath(),
-		g.getBaseImportPath() + "/types",
+		"github.com/rail44/plate/types",
 	}
-	
+
 	// Add time import if any column uses time.Time
 	needsTime := false
 	for _, col := range columns {
@@ -293,7 +292,7 @@ func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]Tab
 	if needsTime {
 		imports = append([]string{"time"}, imports...)
 	}
-	
+
 	data := templateData{
 		PackageName: packageName,
 		TypeName:    typeName,
@@ -302,7 +301,7 @@ func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]Tab
 		Relations:   relations,
 		Imports:     imports,
 	}
-	
+
 	return renderTemplate(tmpl, "queryBuilder", data)
 }
 
@@ -311,15 +310,15 @@ func (g *Generator) getBaseImportPath() string {
 	// Get the import path of the plate package itself
 	t := reflect.TypeOf(Generator{})
 	pkgPath := t.PkgPath()
-	
+
 	// pkgPath will be something like "github.com/rail44/plate"
 	// or "github.com/user/project/vendor/github.com/rail44/plate"
-	
+
 	// Find the last occurrence of "plate" to handle vendored packages
 	if idx := lastIndex(pkgPath, "/plate"); idx >= 0 {
 		return pkgPath[:idx+6] // Include "/plate"
 	}
-	
+
 	// Fallback to the package path as-is
 	return pkgPath
 }
@@ -331,23 +330,29 @@ func (g *Generator) getTablesImportPath() string {
 		Mode: packages.NeedName | packages.NeedModule,
 		Dir:  g.outputDir,
 	}
-	
+
 	pkgs, err := packages.Load(cfg, ".")
 	if err != nil || len(pkgs) == 0 || pkgs[0].Module == nil {
-		// Fallback to default if package information not found
-		return g.getBaseImportPath() + "/tables"
+		// Try parent directory if current directory failed
+		parentDir := filepath.Dir(g.outputDir)
+		cfg.Dir = parentDir
+		pkgs, err = packages.Load(cfg, ".")
+		if err != nil || len(pkgs) == 0 || pkgs[0].Module == nil {
+			// Fallback to default if package information not found
+			return "github.com/rail44/plate/tables"
+		}
 	}
-	
+
 	pkg := pkgs[0]
 	module := pkg.Module
-	
+
 	// Calculate import path based on module and directory
 	absOutputDir, _ := filepath.Abs(g.outputDir)
 	relPath, err := filepath.Rel(module.Dir, absOutputDir)
 	if err != nil {
-		return g.getBaseImportPath() + "/tables"
+		return "github.com/rail44/plate/tables"
 	}
-	
+
 	// Build import path
 	if relPath == "." {
 		return module.Path + "/tables"
@@ -365,4 +370,3 @@ func lastIndex(s, substr string) int {
 	}
 	return last
 }
-

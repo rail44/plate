@@ -8,10 +8,10 @@ import (
 
 // ColumnInfo represents extracted column information
 type ColumnInfo struct {
-	Name         string // Field name (e.g., "ID", "UserID")
-	GoType       string // Go type string (e.g., "string", "int64")
-	SpannerType  string // Spanner type from tag (e.g., "STRING", "INT64")
-	ColumnName   string // Database column name from spanner tag
+	Name        string // Field name (e.g., "ID", "UserID")
+	GoType      string // Go type string (e.g., "string", "int64")
+	SpannerType string // Spanner type from tag (e.g., "STRING", "INT64")
+	ColumnName  string // Database column name from spanner tag
 }
 
 // extractColumns extracts column information from a model using reflection
@@ -25,7 +25,7 @@ func extractColumns(model interface{}) []ColumnInfo {
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		
+
 		// Skip unexported fields
 		if !field.IsExported() {
 			continue
