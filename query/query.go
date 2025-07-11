@@ -7,8 +7,8 @@ import (
 	"github.com/rail44/plate/types"
 )
 
-// And creates an AND condition that groups multiple conditions
-func And[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
+// logicalOp creates a logical operator condition (AND/OR) that groups multiple conditions
+func logicalOp[T types.Table](op ast.BinaryOp, opts ...types.ExprOption[T]) types.ExprOption[T] {
 	return func(s *types.State, expr *ast.Expr) {
 		if len(opts) == 0 {
 			return
@@ -22,7 +22,7 @@ func And[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
 			opts[i](s, &right)
 			left = &ast.ParenExpr{
 				Expr: &ast.BinaryExpr{
-					Op:    ast.OpAnd,
+					Op:    op,
 					Left:  left,
 					Right: right,
 				},
@@ -33,30 +33,14 @@ func And[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
 	}
 }
 
+// And creates an AND condition that groups multiple conditions
+func And[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
+	return logicalOp(ast.OpAnd, opts...)
+}
+
 // Or creates an OR condition from multiple conditions
 func Or[T types.Table](opts ...types.ExprOption[T]) types.ExprOption[T] {
-	return func(s *types.State, expr *ast.Expr) {
-		if len(opts) == 0 {
-			return
-		}
-
-		var left ast.Expr
-		opts[0](s, &left)
-
-		for i := 1; i < len(opts); i++ {
-			var right ast.Expr
-			opts[i](s, &right)
-			left = &ast.ParenExpr{
-				Expr: &ast.BinaryExpr{
-					Op:    ast.OpOr,
-					Left:  left,
-					Right: right,
-				},
-			}
-		}
-
-		*expr = left
-	}
+	return logicalOp(ast.OpOr, opts...)
 }
 
 // Select is a generic select function for any table
@@ -120,6 +104,25 @@ func Select[T types.Table](opts ...types.Option[T]) (string, []any) {
 type KeyPair struct {
 	From string // Key from the source table
 	To   string // Key in the target table
+}
+
+// buildDirectRelationshipWhere builds WHERE clause for direct relationships
+func buildDirectRelationshipWhere(targetTable, baseAlias string, keys KeyPair) ast.Expr {
+	return &ast.BinaryExpr{
+		Left: &ast.Path{
+			Idents: []*ast.Ident{
+				{Name: targetTable},
+				{Name: keys.To},
+			},
+		},
+		Op: ast.OpEqual,
+		Right: &ast.Path{
+			Idents: []*ast.Ident{
+				{Name: baseAlias},
+				{Name: keys.From},
+			},
+		},
+	}
 }
 
 // OrderBy creates an ORDER BY clause for any table type
@@ -196,33 +199,14 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 		baseAlias := s.CurrentAlias()
 
 		// Create a new state for the subquery
-		subState := &types.State{
-			Tables:       make(map[string]struct{}),
-			Params:       s.Params, // Share params with parent
-			CurrentTable: targetTable,
-		}
-		subState.Tables[targetTable] = struct{}{}
+		subState := s.NewSubqueryState(targetTable)
 
 		// Build WHERE conditions for correlation
 		var whereExpr ast.Expr
 
 		if junctionTable == "" {
 			// Direct relationship (belongs_to or has_many)
-			whereExpr = &ast.BinaryExpr{
-				Left: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: targetTable},
-						{Name: keys.To},
-					},
-				},
-				Op: ast.OpEqual,
-				Right: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: baseAlias},
-						{Name: keys.From},
-					},
-				},
-			}
+			whereExpr = buildDirectRelationshipWhere(targetTable, baseAlias, keys)
 		} else {
 			// Many-to-many through junction - no WHERE needed here since we'll use JOIN
 			whereExpr = nil
@@ -392,12 +376,7 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 		baseAlias := s.CurrentAlias()
 
 		// Create a new state for the subquery
-		subState := &types.State{
-			Tables:       make(map[string]struct{}),
-			Params:       s.Params, // Share params with parent
-			CurrentTable: targetTable,
-		}
-		subState.Tables[targetTable] = struct{}{}
+		subState := s.NewSubqueryState(targetTable)
 
 		// Build WHERE conditions for correlation
 		var whereExpr ast.Expr
@@ -405,21 +384,7 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 
 		if junctionTable == "" {
 			// Direct relationship (belongs_to or has_many)
-			whereExpr = &ast.BinaryExpr{
-				Left: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: targetTable},
-						{Name: keys.To},
-					},
-				},
-				Op: ast.OpEqual,
-				Right: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: baseAlias},
-						{Name: keys.From},
-					},
-				},
-			}
+			whereExpr = buildDirectRelationshipWhere(targetTable, baseAlias, keys)
 		} else {
 			// Many-to-many through junction
 			// First create the junction condition

@@ -23,6 +23,17 @@ func (s *State) CurrentAlias() string {
 	return s.CurrentTable
 }
 
+// NewSubqueryState creates a new state for subqueries, inheriting params from parent
+func (s *State) NewSubqueryState(targetTable string) *State {
+	subState := &State{
+		Tables:       make(map[string]struct{}),
+		Params:       s.Params, // Share params with parent
+		CurrentTable: targetTable,
+	}
+	subState.Tables[targetTable] = struct{}{}
+	return subState
+}
+
 type Table interface {
 	TableName() string
 }

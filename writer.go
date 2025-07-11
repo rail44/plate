@@ -75,9 +75,7 @@ type GeneratedFiles struct {
 
 // WriteToDirectory writes all generated files to the specified directory
 func (gf GeneratedFiles) WriteToDirectory(dir string) error {
-	opts := DefaultWriteOptions()
-	opts.BaseDir = dir
-	return WriteFiles(gf.Files, opts)
+	return gf.WriteToDirectoryWithOptions(dir, DefaultWriteOptions())
 }
 
 // WriteToDirectoryWithOptions writes all generated files with custom options
