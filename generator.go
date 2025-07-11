@@ -305,24 +305,6 @@ func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]Tab
 	return renderTemplate(tmpl, "queryBuilder", data)
 }
 
-// getBaseImportPath returns the base import path for generated packages
-func (g *Generator) getBaseImportPath() string {
-	// Get the import path of the plate package itself
-	t := reflect.TypeOf(Generator{})
-	pkgPath := t.PkgPath()
-
-	// pkgPath will be something like "github.com/rail44/plate"
-	// or "github.com/user/project/vendor/github.com/rail44/plate"
-
-	// Find the last occurrence of "plate" to handle vendored packages
-	if idx := lastIndex(pkgPath, "/plate"); idx >= 0 {
-		return pkgPath[:idx+6] // Include "/plate"
-	}
-
-	// Fallback to the package path as-is
-	return pkgPath
-}
-
 // getTablesImportPath returns the import path for the generated tables package
 func (g *Generator) getTablesImportPath() string {
 	// Use packages.Load to get package information
@@ -358,15 +340,4 @@ func (g *Generator) getTablesImportPath() string {
 		return module.Path + "/tables"
 	}
 	return module.Path + "/" + filepath.ToSlash(relPath) + "/tables"
-}
-
-// lastIndex finds the last occurrence of substr in s
-func lastIndex(s, substr string) int {
-	last := -1
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			last = i
-		}
-	}
-	return last
 }

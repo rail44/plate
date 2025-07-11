@@ -3,7 +3,6 @@ package plate
 import (
 	"fmt"
 	"reflect"
-	"strings"
 )
 
 // ColumnInfo represents extracted column information
@@ -111,42 +110,4 @@ func inferSpannerType(t reflect.Type) string {
 
 	// Default to empty string if we can't infer
 	return ""
-}
-
-// hasOrderableType checks if a Spanner type supports ordering operations (Lt, Gt, Le, Ge)
-func hasOrderableType(spannerType string) bool {
-	switch spannerType {
-	case "INT64", "FLOAT64", "TIMESTAMP", "DATE":
-		return true
-	default:
-		return false
-	}
-}
-
-// hasStringOperations checks if a Spanner type supports string operations (Like)
-func hasStringOperations(spannerType string) bool {
-	return spannerType == "STRING"
-}
-
-// hasArrayOperations checks if a Spanner type supports array operations
-func hasArrayOperations(spannerType string) bool {
-	return strings.HasPrefix(spannerType, "ARRAY<")
-}
-
-// getTypeName extracts the type name from a model instance
-func getTypeName(model interface{}) string {
-	t := reflect.TypeOf(model)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	return t.Name()
-}
-
-// getPackagePath extracts the package path from a model instance
-func getPackagePath(model interface{}) string {
-	t := reflect.TypeOf(model)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	return t.PkgPath()
 }
