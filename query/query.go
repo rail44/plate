@@ -205,14 +205,14 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 	opts ...types.Option[TTarget],
 ) types.QueryOption[TBase] {
 	return func(s *types.State, q *ast.Query) {
-		ctx := newSubqueryContext(s, targetTable, keys, junctionTable, junctionKeys)
-		subState := ctx.createSubState()
+		sq := newSubquery(s, targetTable, keys, junctionTable, junctionKeys)
+		subState := sq.createSubState()
 
 		// Build basic subquery
-		subQuery := ctx.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
+		subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
 
 		// Apply options
-		ctx.applyOptions(subState, subQuery, convertOptions(opts))
+		sq.applyOptions(subState, subQuery, convertOptions(opts))
 
 		// Create the final subquery expression
 		var subqueryExpr ast.Expr
@@ -252,10 +252,10 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 						},
 					},
 					From: &ast.From{
-						Source: ctx.buildJunctionJoin(),
+						Source: sq.buildJunctionJoin(),
 					},
 					Where: &ast.Where{
-						Expr: ctx.buildJunctionCorrelation(),
+						Expr: sq.buildJunctionCorrelation(),
 					},
 				}
 
@@ -307,8 +307,8 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 	opts ...types.Option[TTarget],
 ) types.ExprOption[TBase] {
 	return func(s *types.State, expr *ast.Expr) {
-		ctx := newSubqueryContext(s, targetTable, keys, junctionTable, junctionKeys)
-		subState := ctx.createSubState()
+		sq := newSubquery(s, targetTable, keys, junctionTable, junctionKeys)
+		subState := sq.createSubState()
 
 		// Create EXISTS subquery with SELECT 1
 		selectItems := []ast.SelectItem{
@@ -320,24 +320,24 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 		var subQuery *ast.Query
 		if junctionTable == "" {
 			// Direct relationship
-			subQuery = ctx.buildBasicSubquery(selectItems)
+			subQuery = sq.buildBasicSubquery(selectItems)
 		} else {
 			// Junction relationship - need to handle differently
 			subQuery = &ast.Query{
 				Query: &ast.Select{
 					Results: selectItems,
 					From: &ast.From{
-						Source: ctx.buildJunctionJoin(),
+						Source: sq.buildJunctionJoin(),
 					},
 					Where: &ast.Where{
-						Expr: ctx.buildJunctionCorrelation(),
+						Expr: sq.buildJunctionCorrelation(),
 					},
 				},
 			}
 		}
 
 		// Apply options
-		ctx.applyOptions(subState, subQuery, convertOptions(opts))
+		sq.applyOptions(subState, subQuery, convertOptions(opts))
 
 		// Create EXISTS expression
 		*expr = &ast.ExistsSubQuery{

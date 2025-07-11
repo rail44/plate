@@ -2,6 +2,11 @@
 
 package tables
 
+// Tag represents the tag table
+type Tag struct{}
+
+func (Tag) TableName() string { return "tag" }
+
 // User represents the user table
 type User struct{}
 
@@ -11,8 +16,3 @@ func (User) TableName() string { return "user" }
 type Post struct{}
 
 func (Post) TableName() string { return "post" }
-
-// Tag represents the tag table
-type Tag struct{}
-
-func (Tag) TableName() string { return "tag" }

@@ -22,7 +22,7 @@ func TestExamplesIntegration(t *testing.T) {
 	// Step 2: Run tests with the newly generated code
 	// This ensures the tests compile and run with the latest generated code
 	t.Log("Running tests with fresh generated code...")
-	testCmd := exec.Command("go", "test", "-v")
+	testCmd := exec.Command("go", "test", "-v", "-count=1")
 	testCmd.Dir = examplesDir
 	output, err = testCmd.CombinedOutput()
 	if err != nil {

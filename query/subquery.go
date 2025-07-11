@@ -5,8 +5,8 @@ import (
 	"github.com/rail44/plate/types"
 )
 
-// subqueryContext holds common data for building subqueries
-type subqueryContext struct {
+// subquery holds common data for building subqueries
+type subquery struct {
 	parentState   *types.State
 	baseAlias     string
 	targetTable   string
@@ -15,9 +15,9 @@ type subqueryContext struct {
 	junctionKeys  KeyPair
 }
 
-// newSubqueryContext creates a new subquery context
-func newSubqueryContext(parentState *types.State, targetTable string, keys KeyPair, junctionTable string, junctionKeys KeyPair) *subqueryContext {
-	return &subqueryContext{
+// newSubquery creates a new subquery builder
+func newSubquery(parentState *types.State, targetTable string, keys KeyPair, junctionTable string, junctionKeys KeyPair) *subquery {
+	return &subquery{
 		parentState:   parentState,
 		baseAlias:     parentState.CurrentAlias(),
 		targetTable:   targetTable,
@@ -28,66 +28,66 @@ func newSubqueryContext(parentState *types.State, targetTable string, keys KeyPa
 }
 
 // createSubState creates a new state for the subquery
-func (ctx *subqueryContext) createSubState() *types.State {
-	return ctx.parentState.NewSubqueryState(ctx.targetTable)
+func (sq *subquery) createSubState() *types.State {
+	return sq.parentState.NewSubqueryState(sq.targetTable)
 }
 
 // buildDirectRelationshipWhere builds WHERE clause for direct relationships
-func (ctx *subqueryContext) buildDirectRelationshipWhere() ast.Expr {
-	if ctx.junctionTable != "" {
+func (sq *subquery) buildDirectRelationshipWhere() ast.Expr {
+	if sq.junctionTable != "" {
 		return nil // Junction relationships don't use direct WHERE
 	}
-	return buildDirectRelationshipWhere(ctx.targetTable, ctx.baseAlias, ctx.keys)
+	return buildDirectRelationshipWhere(sq.targetTable, sq.baseAlias, sq.keys)
 }
 
 // buildJunctionCorrelation builds the WHERE clause for junction table correlation
-func (ctx *subqueryContext) buildJunctionCorrelation() ast.Expr {
-	if ctx.junctionTable == "" {
+func (sq *subquery) buildJunctionCorrelation() ast.Expr {
+	if sq.junctionTable == "" {
 		return nil
 	}
 	return &ast.BinaryExpr{
 		Left: &ast.Path{
 			Idents: []*ast.Ident{
-				{Name: ctx.junctionTable},
-				{Name: ctx.keys.To},
+				{Name: sq.junctionTable},
+				{Name: sq.keys.To},
 			},
 		},
 		Op: ast.OpEqual,
 		Right: &ast.Path{
 			Idents: []*ast.Ident{
-				{Name: ctx.baseAlias},
-				{Name: ctx.keys.From},
+				{Name: sq.baseAlias},
+				{Name: sq.keys.From},
 			},
 		},
 	}
 }
 
 // buildJunctionJoin builds the JOIN clause for junction tables
-func (ctx *subqueryContext) buildJunctionJoin() *ast.Join {
-	if ctx.junctionTable == "" {
+func (sq *subquery) buildJunctionJoin() *ast.Join {
+	if sq.junctionTable == "" {
 		return nil
 	}
 	return &ast.Join{
 		Op: ast.InnerJoin,
 		Left: &ast.TableName{
-			Table: &ast.Ident{Name: ctx.targetTable},
+			Table: &ast.Ident{Name: sq.targetTable},
 		},
 		Right: &ast.TableName{
-			Table: &ast.Ident{Name: ctx.junctionTable},
+			Table: &ast.Ident{Name: sq.junctionTable},
 		},
 		Cond: &ast.On{
 			Expr: &ast.BinaryExpr{
 				Left: &ast.Path{
 					Idents: []*ast.Ident{
-						{Name: ctx.targetTable},
-						{Name: ctx.junctionKeys.To},
+						{Name: sq.targetTable},
+						{Name: sq.junctionKeys.To},
 					},
 				},
 				Op: ast.OpEqual,
 				Right: &ast.Path{
 					Idents: []*ast.Ident{
-						{Name: ctx.junctionTable},
-						{Name: ctx.junctionKeys.From},
+						{Name: sq.junctionTable},
+						{Name: sq.junctionKeys.From},
 					},
 				},
 			},
@@ -96,15 +96,15 @@ func (ctx *subqueryContext) buildJunctionJoin() *ast.Join {
 }
 
 // buildBasicSubquery creates a basic subquery with FROM and WHERE
-func (ctx *subqueryContext) buildBasicSubquery(selectItems []ast.SelectItem) *ast.Query {
-	whereExpr := ctx.buildDirectRelationshipWhere()
+func (sq *subquery) buildBasicSubquery(selectItems []ast.SelectItem) *ast.Query {
+	whereExpr := sq.buildDirectRelationshipWhere()
 
 	query := &ast.Query{
 		Query: &ast.Select{
 			Results: selectItems,
 			From: &ast.From{
 				Source: &ast.TableName{
-					Table: &ast.Ident{Name: ctx.targetTable},
+					Table: &ast.Ident{Name: sq.targetTable},
 				},
 			},
 		},
@@ -120,10 +120,10 @@ func (ctx *subqueryContext) buildBasicSubquery(selectItems []ast.SelectItem) *as
 }
 
 // applyOptions applies the given options to the subquery
-func (ctx *subqueryContext) applyOptions(subState *types.State, subQuery *ast.Query, opts []types.Option[types.Table]) {
+func (sq *subquery) applyOptions(subState *types.State, subQuery *ast.Query, opts []types.Option[types.Table]) {
 	for _, opt := range opts {
 		opt.Apply(subState, subQuery)
 	}
 	// Update parent state params
-	ctx.parentState.Params = subState.Params
+	sq.parentState.Params = subState.Params
 }
