@@ -42,7 +42,6 @@ type Relation struct {
 	ReverseName string // Optional: Name for the reverse HasMany relation (e.g., "Posts")
 }
 
-
 // Generator is responsible for generating query builder code
 type Generator struct {
 	config    GeneratorConfig
@@ -220,7 +219,7 @@ type generatedRelation struct {
 	Type          string // "belongs_to", "has_many", "many_to_many"
 	Target        string
 	Keys          query.KeyPair
-	JunctionTable string  // For many_to_many
+	JunctionTable string        // For many_to_many
 	JunctionKeys  query.KeyPair // For many_to_many
 }
 
@@ -270,11 +269,21 @@ func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]Tab
 	relations := relationMap[typeName]
 
 	// Determine imports
+	tablesImportPath, err := g.getTablesImportPath()
+	if err != nil {
+		return "", fmt.Errorf("failed to get tables import path: %v", err)
+	}
+
+	plateImportPath, err := g.getPlateImportPath()
+	if err != nil {
+		return "", fmt.Errorf("failed to get plate import path: %v", err)
+	}
+
 	imports := []string{
 		"github.com/cloudspannerecosystem/memefish/ast",
-		"github.com/rail44/plate/query",
-		g.getTablesImportPath(),
-		"github.com/rail44/plate/types",
+		plateImportPath + "/query",
+		tablesImportPath,
+		plateImportPath + "/types",
 	}
 
 	// Add time import if any column uses time.Time
@@ -302,38 +311,63 @@ func (g *Generator) generateQueryBuilder(tc TableConfig, tableMap map[string]Tab
 }
 
 // getTablesImportPath returns the import path for the generated tables package
-func (g *Generator) getTablesImportPath() string {
-	// Use packages.Load to get package information
+func (g *Generator) getTablesImportPath() (string, error) {
+	// Convert output directory to absolute path
+	absOutputDir, err := filepath.Abs(g.outputDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %v", err)
+	}
+
+	// Load package information from the parent directory of output
+	// This ensures we're in a valid package context
+	parentDir := filepath.Dir(absOutputDir)
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedModule,
-		Dir:  g.outputDir,
+		Dir:  parentDir,
 	}
 
 	pkgs, err := packages.Load(cfg, ".")
-	if err != nil || len(pkgs) == 0 || pkgs[0].Module == nil {
-		// Try parent directory if current directory failed
-		parentDir := filepath.Dir(g.outputDir)
-		cfg.Dir = parentDir
-		pkgs, err = packages.Load(cfg, ".")
-		if err != nil || len(pkgs) == 0 || pkgs[0].Module == nil {
-			// Fallback to default if package information not found
-			return "github.com/rail44/plate/tables"
-		}
+	if err != nil {
+		return "", fmt.Errorf("failed to load package information: %v", err)
+	}
+
+	if len(pkgs) == 0 {
+		return "", fmt.Errorf("no package found at %s", parentDir)
 	}
 
 	pkg := pkgs[0]
-	module := pkg.Module
-
-	// Calculate import path based on module and directory
-	absOutputDir, _ := filepath.Abs(g.outputDir)
-	relPath, err := filepath.Rel(module.Dir, absOutputDir)
-	if err != nil {
-		return "github.com/rail44/plate/tables"
+	if pkg.Module == nil {
+		return "", fmt.Errorf("no module information found (is there a go.mod in the project?)")
 	}
 
-	// Build import path
-	if relPath == "." {
-		return module.Path + "/tables"
+	// Build import path from package path + relative path to output + /tables
+	outputBase := filepath.Base(absOutputDir)
+	return pkg.PkgPath + "/" + outputBase + "/tables", nil
+}
+
+// getPlateImportPath returns the import path for the plate module
+func (g *Generator) getPlateImportPath() (string, error) {
+	// Load the plate package to get its import path
+	cfg := &packages.Config{
+		Mode: packages.NeedName,
 	}
-	return module.Path + "/" + filepath.ToSlash(relPath) + "/tables"
+
+	// Try to load github.com/rail44/plate first
+	pkgs, err := packages.Load(cfg, "github.com/rail44/plate")
+	if err == nil && len(pkgs) > 0 && pkgs[0].PkgPath != "" {
+		return pkgs[0].PkgPath, nil
+	}
+
+	// If that fails, the plate module might be in development or vendored
+	// In this case, we need to detect it from the runtime
+	// Get the import path of the Generator type itself
+	t := reflect.TypeOf(g)
+	pkgPath := t.PkgPath()
+
+	// pkgPath should be something like "github.com/rail44/plate" or a local path
+	if pkgPath != "" {
+		return pkgPath, nil
+	}
+
+	return "", fmt.Errorf("could not determine plate module import path")
 }
