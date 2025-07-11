@@ -57,11 +57,6 @@ func Not(opt types.ExprOption[tables.User]) types.ExprOption[tables.User] {
 	return query.Not(opt)
 }
 
-// WithInnerJoin changes the JOIN type to INNER JOIN
-func WithInnerJoin() types.QueryOption[tables.User] {
-	return query.WithInnerJoinOption[tables.User]()
-}
-
 // WithPosts fetches related Post as a nested array of structs
 func WithPosts(opts ...types.Option[tables.Post]) types.QueryOption[tables.User] {
 	return query.WithSubquery[tables.User, tables.Post](

@@ -77,10 +77,6 @@ func Not(opt types.ExprOption[tables.{{.TypeName}}]) types.ExprOption[tables.{{.
 	return query.Not(opt)
 }
 
-// WithInnerJoin changes the JOIN type to INNER JOIN
-func WithInnerJoin() types.QueryOption[tables.{{.TypeName}}] {
-	return query.WithInnerJoinOption[tables.{{.TypeName}}]()
-}
 
 {{range .Relations}}
 {{if eq .Type "belongs_to"}}// With{{.Name}} fetches related {{.Target}} as a nested struct

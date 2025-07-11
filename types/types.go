@@ -3,14 +3,13 @@ package types
 import (
 	"fmt"
 	"github.com/cloudspannerecosystem/memefish/ast"
-	"strings"
 )
 
 type State struct {
-	Tables           map[string]struct{}
-	Params           []any
-	RelationshipPath []string         // Track relationship path for alias generation
-	SubqueryColumns  []SubqueryColumn // Track subqueries to add to SELECT
+	Tables          map[string]struct{}
+	Params          []any
+	CurrentTable    string           // Current table name for the query scope
+	SubqueryColumns []SubqueryColumn // Track subqueries to add to SELECT
 }
 
 // SubqueryColumn represents a column that will be added to SELECT as a subquery
@@ -19,61 +18,9 @@ type SubqueryColumn struct {
 	Subquery ast.Expr
 }
 
-// registerRelationship registers a relationship and generates an alias
-func (s *State) registerRelationship(relationshipName string) string {
-	// Add to path
-	s.RelationshipPath = append(s.RelationshipPath, relationshipName)
-
-	// Get alias using CurrentAlias
-	alias := s.CurrentAlias()
-
-	s.Tables[alias] = struct{}{}
-	return alias
-}
-
-// RegisterJunction registers a junction table alias without advancing the path
-func (s *State) RegisterJunction(tableName string) string {
-	// Generate junction table alias based on current alias
-	currentAlias := s.CurrentAlias()
-	alias := ""
-	if currentAlias != "" {
-		alias = currentAlias + "_" + tableName
-	} else {
-		alias = tableName
-	}
-
-	s.Tables[alias] = struct{}{}
-	return alias
-}
-
-// CurrentAlias gets the current alias from the relationship path
+// CurrentAlias returns the current table name
 func (s *State) CurrentAlias() string {
-	if len(s.RelationshipPath) == 0 {
-		return ""
-	}
-	if len(s.RelationshipPath) == 1 {
-		// Root table case
-		return s.RelationshipPath[0]
-	}
-	// For 2+ elements, join all except the first
-	return strings.Join(s.RelationshipPath[1:], "_")
-}
-
-// WithRelationship executes a function within a relationship scope
-// Note: This method is primarily intended for use in JOIN method implementations
-func (s *State) WithRelationship(relationshipName string, fn func(alias string)) {
-	// Save current path
-	basePath := make([]string, len(s.RelationshipPath))
-	copy(basePath, s.RelationshipPath)
-
-	// Register relationship
-	alias := s.registerRelationship(relationshipName)
-
-	// Execute function in scope
-	fn(alias)
-
-	// Restore path
-	s.RelationshipPath = basePath
+	return s.CurrentTable
 }
 
 type Table interface {

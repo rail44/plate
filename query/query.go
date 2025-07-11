@@ -65,10 +65,10 @@ func Select[T types.Table](opts ...types.Option[T]) (string, []any) {
 	tableName := t.TableName()
 
 	s := &types.State{
-		Tables:           make(map[string]struct{}),
-		Params:           []any{},
-		RelationshipPath: []string{tableName}, // Start from root table
-		SubqueryColumns:  []types.SubqueryColumn{},
+		Tables:          make(map[string]struct{}),
+		Params:          []any{},
+		CurrentTable:    tableName,
+		SubqueryColumns: []types.SubqueryColumn{},
 	}
 	s.Tables[tableName] = struct{}{}
 
@@ -120,99 +120,6 @@ func Select[T types.Table](opts ...types.Option[T]) (string, []any) {
 type KeyPair struct {
 	From string // Key from the source table
 	To   string // Key in the target table
-}
-
-// joinConfig contains configuration for building JOIN clauses
-type joinConfig struct {
-	Source      ast.TableExpr
-	BaseTable   string
-	TargetTable string
-	TargetAlias string
-	Keys        KeyPair
-	JoinType    ast.JoinOp // JOIN type (INNER, LEFT OUTER, etc.)
-}
-
-// joinThroughConfig contains configuration for building many-to-many JOIN through a junction table
-type joinThroughConfig struct {
-	Source           ast.TableExpr
-	BaseTable        string
-	JunctionTable    string
-	JunctionAlias    string
-	TargetTable      string
-	TargetAlias      string
-	BaseToJunction   KeyPair
-	JunctionToTarget KeyPair
-	JoinType         ast.JoinOp
-}
-
-// joinThrough creates a many-to-many JOIN through a junction table
-func joinThrough(config joinThroughConfig) *ast.Join {
-	// First create junction table join
-	junctionJoin := join(joinConfig{
-		Source:      config.Source,
-		BaseTable:   config.BaseTable,
-		TargetTable: config.JunctionTable,
-		TargetAlias: config.JunctionAlias,
-		Keys:        config.BaseToJunction,
-		JoinType:    config.JoinType,
-	})
-
-	// Then create target table join using junction join as source
-	return join(joinConfig{
-		Source:      junctionJoin,
-		BaseTable:   config.JunctionAlias,
-		TargetTable: config.TargetTable,
-		TargetAlias: config.TargetAlias,
-		Keys:        config.JunctionToTarget,
-		JoinType:    config.JoinType,
-	})
-}
-
-// findLastJoin recursively finds the last JOIN in the FROM clause
-func findLastJoin(source ast.TableExpr) *ast.Join {
-	if join, ok := source.(*ast.Join); ok {
-		// Check if the right side has more joins
-		if rightJoin := findLastJoin(join.Right); rightJoin != nil {
-			return rightJoin
-		}
-		return join
-	}
-	return nil
-}
-
-// join creates a JOIN AST node
-func join(config joinConfig) *ast.Join {
-	return &ast.Join{
-		Left: config.Source,
-		Op:   config.JoinType,
-		Right: &ast.TableName{
-			Table: &ast.Ident{
-				Name: config.TargetTable,
-			},
-			As: &ast.AsAlias{
-				Alias: &ast.Ident{
-					Name: config.TargetAlias,
-				},
-			},
-		},
-		Cond: &ast.On{
-			Expr: &ast.BinaryExpr{
-				Left: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: config.BaseTable},
-						{Name: config.Keys.From},
-					},
-				},
-				Op: ast.OpEqual,
-				Right: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: config.TargetAlias},
-						{Name: config.Keys.To},
-					},
-				},
-			},
-		},
-	}
 }
 
 // OrderBy creates an ORDER BY clause for any table type
@@ -273,86 +180,6 @@ func Limit[T types.Table](count int) types.QueryOption[T] {
 	}
 }
 
-// WithInnerJoinOption changes the JOIN type to INNER JOIN for any table type
-func WithInnerJoinOption[T types.Table]() types.QueryOption[T] {
-	return func(s *types.State, q *ast.Query) {
-		// Find the last JOIN and change its type
-		if sl, ok := q.Query.(*ast.Select); ok {
-			if join := findLastJoin(sl.From.Source); join != nil {
-				join.Op = ast.InnerJoin
-			}
-		}
-	}
-}
-
-// DirectJoin creates a direct JOIN relationship (one-to-many or belongs-to)
-func DirectJoin[TBase types.Table, TTarget types.Table](
-	relationshipName string,
-	targetTable string,
-	keys KeyPair,
-	joinType ast.JoinOp,
-	opts ...types.Option[TTarget],
-) types.QueryOption[TBase] {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-		baseAlias := s.CurrentAlias()
-
-		s.WithRelationship(relationshipName, func(alias string) {
-			// Create and apply JOIN
-			sl.From.Source = join(joinConfig{
-				Source:      sl.From.Source,
-				BaseTable:   baseAlias,
-				TargetTable: targetTable,
-				TargetAlias: alias,
-				Keys:        keys,
-				JoinType:    joinType,
-			})
-
-			// Apply options
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-		})
-	}
-}
-
-// JunctionJoin creates a many-to-many JOIN through a junction table
-func JunctionJoin[TBase types.Table, TTarget types.Table](
-	relationshipName string,
-	junctionTable string,
-	baseToJunction KeyPair,
-	targetTable string,
-	junctionToTarget KeyPair,
-	joinType ast.JoinOp,
-	opts ...types.Option[TTarget],
-) types.QueryOption[TBase] {
-	return func(s *types.State, q *ast.Query) {
-		sl := q.Query.(*ast.Select)
-		baseAlias := s.CurrentAlias()
-		junctionAlias := s.RegisterJunction(junctionTable)
-
-		s.WithRelationship(relationshipName, func(targetAlias string) {
-			// Create and apply JOIN
-			sl.From.Source = joinThrough(joinThroughConfig{
-				Source:           sl.From.Source,
-				BaseTable:        baseAlias,
-				JunctionTable:    junctionTable,
-				JunctionAlias:    junctionAlias,
-				TargetTable:      targetTable,
-				TargetAlias:      targetAlias,
-				BaseToJunction:   baseToJunction,
-				JunctionToTarget: junctionToTarget,
-				JoinType:         joinType,
-			})
-
-			// Apply options
-			for _, opt := range opts {
-				opt.Apply(s, q)
-			}
-		})
-	}
-}
-
 // WithSubquery adds a subquery column to the SELECT clause
 // For belongs_to: (SELECT AS STRUCT t.* FROM t WHERE ...)
 // For has_many/many_to_many: ARRAY(SELECT AS STRUCT t.* FROM t WHERE ...)
@@ -370,9 +197,9 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 
 		// Create a new state for the subquery
 		subState := &types.State{
-			Tables:           make(map[string]struct{}),
-			Params:           s.Params, // Share params with parent
-			RelationshipPath: []string{targetTable},
+			Tables:       make(map[string]struct{}),
+			Params:       s.Params, // Share params with parent
+			CurrentTable: targetTable,
 		}
 		subState.Tables[targetTable] = struct{}{}
 
@@ -414,7 +241,7 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 				},
 			},
 		}
-		
+
 		// Add WHERE clause only if we have a where expression
 		if whereExpr != nil {
 			subQuery.Query.(*ast.Select).Where = &ast.Where{
@@ -437,7 +264,7 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 		if isArray {
 			// ARRAY for has_many and many_to_many
 			var structSelect *ast.Select
-			
+
 			if junctionTable == "" {
 				// Direct has_many relationship
 				structSelect = &ast.Select{
@@ -457,9 +284,9 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 				if subSelect.Where != nil {
 					additionalWhere = subSelect.Where.Expr
 				}
-				
+
 				structSelect = &ast.Select{
-					As:      &ast.AsStruct{},
+					As: &ast.AsStruct{},
 					Results: []ast.SelectItem{
 						&ast.DotStar{
 							Expr: &ast.Path{
@@ -513,7 +340,7 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 						},
 					},
 				}
-				
+
 				// Apply additional WHERE conditions from options
 				if additionalWhere != nil {
 					structSelect.Where.Expr = &ast.BinaryExpr{
@@ -566,9 +393,9 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 
 		// Create a new state for the subquery
 		subState := &types.State{
-			Tables:           make(map[string]struct{}),
-			Params:           s.Params, // Share params with parent
-			RelationshipPath: []string{targetTable},
+			Tables:       make(map[string]struct{}),
+			Params:       s.Params, // Share params with parent
+			CurrentTable: targetTable,
 		}
 		subState.Tables[targetTable] = struct{}{}
 
@@ -701,7 +528,7 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 		// Create EXISTS expression
 		*expr = &ast.ExistsSubQuery{
 			Exists: 0, // Token position will be set by memefish
-			Query: subQuery,
+			Query:  subQuery,
 		}
 	}
 }
