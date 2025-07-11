@@ -125,6 +125,15 @@ func buildDirectRelationshipWhere(targetTable, baseAlias string, keys KeyPair) a
 	}
 }
 
+// convertOptions converts typed options to untyped options for subquery context
+func convertOptions[T types.Table](opts []types.Option[T]) []types.Option[types.Table] {
+	result := make([]types.Option[types.Table], len(opts))
+	for i, opt := range opts {
+		result[i] = types.Option[types.Table](opt)
+	}
+	return result
+}
+
 // OrderBy creates an ORDER BY clause for any table type
 func OrderBy[T types.Table, V any](column types.Column[T, V], dir ast.Direction) types.QueryOption[T] {
 	return func(s *types.State, q *ast.Query) {
@@ -196,50 +205,14 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 	opts ...types.Option[TTarget],
 ) types.QueryOption[TBase] {
 	return func(s *types.State, q *ast.Query) {
-		baseAlias := s.CurrentAlias()
+		ctx := newSubqueryContext(s, targetTable, keys, junctionTable, junctionKeys)
+		subState := ctx.createSubState()
 
-		// Create a new state for the subquery
-		subState := s.NewSubqueryState(targetTable)
-
-		// Build WHERE conditions for correlation
-		var whereExpr ast.Expr
-
-		if junctionTable == "" {
-			// Direct relationship (belongs_to or has_many)
-			whereExpr = buildDirectRelationshipWhere(targetTable, baseAlias, keys)
-		} else {
-			// Many-to-many through junction - no WHERE needed here since we'll use JOIN
-			whereExpr = nil
-		}
-
-		// Apply options to add more WHERE conditions
-		subQuery := &ast.Query{
-			Query: &ast.Select{
-				Results: []ast.SelectItem{
-					&ast.Star{},
-				},
-				From: &ast.From{
-					Source: &ast.TableName{
-						Table: &ast.Ident{Name: targetTable},
-					},
-				},
-			},
-		}
-
-		// Add WHERE clause only if we have a where expression
-		if whereExpr != nil {
-			subQuery.Query.(*ast.Select).Where = &ast.Where{
-				Expr: whereExpr,
-			}
-		}
+		// Build basic subquery
+		subQuery := ctx.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
 
 		// Apply options
-		for _, opt := range opts {
-			opt.Apply(subState, subQuery)
-		}
-
-		// Update parent state params
-		s.Params = subState.Params
+		ctx.applyOptions(subState, subQuery, convertOptions(opts))
 
 		// Create the final subquery expression
 		var subqueryExpr ast.Expr
@@ -279,49 +252,10 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 						},
 					},
 					From: &ast.From{
-						Source: &ast.Join{
-							Op: ast.InnerJoin,
-							Left: &ast.TableName{
-								Table: &ast.Ident{Name: targetTable},
-							},
-							Right: &ast.TableName{
-								Table: &ast.Ident{Name: junctionTable},
-							},
-							Cond: &ast.On{
-								Expr: &ast.BinaryExpr{
-									Left: &ast.Path{
-										Idents: []*ast.Ident{
-											{Name: targetTable},
-											{Name: junctionKeys.To},
-										},
-									},
-									Op: ast.OpEqual,
-									Right: &ast.Path{
-										Idents: []*ast.Ident{
-											{Name: junctionTable},
-											{Name: junctionKeys.From},
-										},
-									},
-								},
-							},
-						},
+						Source: ctx.buildJunctionJoin(),
 					},
 					Where: &ast.Where{
-						Expr: &ast.BinaryExpr{
-							Left: &ast.Path{
-								Idents: []*ast.Ident{
-									{Name: junctionTable},
-									{Name: keys.To},
-								},
-							},
-							Op: ast.OpEqual,
-							Right: &ast.Path{
-								Idents: []*ast.Ident{
-									{Name: baseAlias},
-									{Name: keys.From},
-								},
-							},
-						},
+						Expr: ctx.buildJunctionCorrelation(),
 					},
 				}
 
@@ -373,122 +307,37 @@ func WhereExists[TBase types.Table, TTarget types.Table](
 	opts ...types.Option[TTarget],
 ) types.ExprOption[TBase] {
 	return func(s *types.State, expr *ast.Expr) {
-		baseAlias := s.CurrentAlias()
+		ctx := newSubqueryContext(s, targetTable, keys, junctionTable, junctionKeys)
+		subState := ctx.createSubState()
 
-		// Create a new state for the subquery
-		subState := s.NewSubqueryState(targetTable)
-
-		// Build WHERE conditions for correlation
-		var whereExpr ast.Expr
-		var junctionCond ast.Expr // Declare at function scope
-
-		if junctionTable == "" {
-			// Direct relationship (belongs_to or has_many)
-			whereExpr = buildDirectRelationshipWhere(targetTable, baseAlias, keys)
-		} else {
-			// Many-to-many through junction
-			// First create the junction condition
-			junctionCond = &ast.BinaryExpr{
-				Left: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: junctionTable},
-						{Name: keys.To},
-					},
-				},
-				Op: ast.OpEqual,
-				Right: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: baseAlias},
-						{Name: keys.From},
-					},
-				},
-			}
-
-			// Then create the target-junction join condition
-			targetJoinCond := &ast.BinaryExpr{
-				Left: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: targetTable},
-						{Name: junctionKeys.To},
-					},
-				},
-				Op: ast.OpEqual,
-				Right: &ast.Path{
-					Idents: []*ast.Ident{
-						{Name: junctionTable},
-						{Name: junctionKeys.From},
-					},
-				},
-			}
-
-			// Combine both conditions
-			whereExpr = &ast.BinaryExpr{
-				Op:    ast.OpAnd,
-				Left:  junctionCond,
-				Right: targetJoinCond,
-			}
-		}
-
-		// Create EXISTS subquery
-		subQuery := &ast.Query{
-			Query: &ast.Select{
-				Results: []ast.SelectItem{
-					&ast.ExprSelectItem{
-						Expr: &ast.IntLiteral{Value: "1"},
-					},
-				},
-				From: &ast.From{
-					Source: &ast.TableName{
-						Table: &ast.Ident{Name: targetTable},
-					},
-				},
-				Where: &ast.Where{
-					Expr: whereExpr,
-				},
+		// Create EXISTS subquery with SELECT 1
+		selectItems := []ast.SelectItem{
+			&ast.ExprSelectItem{
+				Expr: &ast.IntLiteral{Value: "1"},
 			},
 		}
 
-		// Add junction table to FROM if needed
-		if junctionTable != "" {
-			subSelect := subQuery.Query.(*ast.Select)
-			subSelect.From.Source = &ast.Join{
-				Op: ast.InnerJoin,
-				Left: &ast.TableName{
-					Table: &ast.Ident{Name: targetTable},
-				},
-				Right: &ast.TableName{
-					Table: &ast.Ident{Name: junctionTable},
-				},
-				Cond: &ast.On{
-					Expr: &ast.BinaryExpr{
-						Left: &ast.Path{
-							Idents: []*ast.Ident{
-								{Name: targetTable},
-								{Name: junctionKeys.To},
-							},
-						},
-						Op: ast.OpEqual,
-						Right: &ast.Path{
-							Idents: []*ast.Ident{
-								{Name: junctionTable},
-								{Name: junctionKeys.From},
-							},
-						},
+		var subQuery *ast.Query
+		if junctionTable == "" {
+			// Direct relationship
+			subQuery = ctx.buildBasicSubquery(selectItems)
+		} else {
+			// Junction relationship - need to handle differently
+			subQuery = &ast.Query{
+				Query: &ast.Select{
+					Results: selectItems,
+					From: &ast.From{
+						Source: ctx.buildJunctionJoin(),
+					},
+					Where: &ast.Where{
+						Expr: ctx.buildJunctionCorrelation(),
 					},
 				},
 			}
-
-			// Update WHERE to only include the base-junction condition
-			subSelect.Where.Expr = junctionCond
 		}
 
 		// Apply options
-		for _, opt := range opts {
-			opt.Apply(subState, subQuery)
-		}
-
-		// Update parent state params
-		s.Params = subState.Params
+		ctx.applyOptions(subState, subQuery, convertOptions(opts))
 
 		// Create EXISTS expression
 		*expr = &ast.ExistsSubQuery{
