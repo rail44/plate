@@ -64,7 +64,7 @@ func TestUserQueries(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT user.*, ((SELECT ARRAY_AGG(((SELECT AS STRUCT * FROM post WHERE post.user_id = user.id AND post.title = @p0))))) AS posts FROM user",
+			wantSQL:  "SELECT user.*, ARRAY(SELECT AS STRUCT * FROM post WHERE post.user_id = user.id AND post.title = @p0) AS posts FROM user",
 			wantArgs: []any{"Hello World"},
 		},
 		{
@@ -116,7 +116,7 @@ func TestPostQueries(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT post.*, ((SELECT AS STRUCT * FROM user WHERE user.id = post.user_id AND user.name = @p0)) AS author FROM post",
+			wantSQL:  "SELECT post.*, (SELECT AS STRUCT * FROM user WHERE user.id = post.user_id AND user.name = @p0) AS author FROM post",
 			wantArgs: []any{"Alice"},
 		},
 		{
@@ -128,7 +128,7 @@ func TestPostQueries(t *testing.T) {
 					),
 				)
 			},
-			wantSQL:  "SELECT post.*, ((SELECT ARRAY_AGG(((SELECT AS STRUCT * FROM tag WHERE tag.id IN (SELECT post_tag.tag_id FROM post_tag WHERE post_tag.post_id = post.id) AND tag.name = @p0))))) AS tags FROM post",
+			wantSQL:  "SELECT post.*, ARRAY(SELECT AS STRUCT * FROM tag WHERE tag.id IN (SELECT post_tag.tag_id FROM post_tag WHERE post_tag.post_id = post.id) AND tag.name = @p0) AS tags FROM post",
 			wantArgs: []any{"golang"},
 		},
 		{

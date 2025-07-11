@@ -355,7 +355,7 @@ func JunctionJoin[TBase types.Table, TTarget types.Table](
 
 // WithSubquery adds a subquery column to the SELECT clause
 // For belongs_to: (SELECT AS STRUCT t.* FROM t WHERE ...)
-// For has_many/many_to_many: (SELECT ARRAY_AGG(AS STRUCT t.*) FROM t WHERE ...)
+// For has_many/many_to_many: ARRAY(SELECT AS STRUCT t.* FROM t WHERE ...)
 func WithSubquery[TBase types.Table, TTarget types.Table](
 	relationshipName string,
 	targetTable string,
@@ -476,7 +476,7 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 		subSelect := subQuery.Query.(*ast.Select)
 
 		if isArray {
-			// ARRAY_AGG for has_many and many_to_many
+			// ARRAY for has_many and many_to_many
 			// Create SELECT AS STRUCT for the inner query
 			structSelect := &ast.Select{
 				As:      &ast.AsStruct{},
@@ -489,49 +489,21 @@ func WithSubquery[TBase types.Table, TTarget types.Table](
 				Where: subSelect.Where,
 			}
 
-			// Create ARRAY_AGG call
-			arrayAggExpr := &ast.CallExpr{
-				Func: &ast.Path{
-					Idents: []*ast.Ident{{Name: "ARRAY_AGG"}},
-				},
-				Args: []ast.Arg{
-					&ast.ExprArg{
-						Expr: &ast.ScalarSubQuery{
-							Query: &ast.SubQuery{
-								Query: &ast.Query{
-									Query: structSelect,
-								},
-							},
-						},
-					},
-				},
-			}
-
-			// Wrap in scalar subquery
-			subqueryExpr = &ast.ScalarSubQuery{
-				Query: &ast.SubQuery{
-					Query: &ast.Query{
-						Query: &ast.Select{
-							Results: []ast.SelectItem{
-								&ast.ExprSelectItem{
-									Expr: arrayAggExpr,
-								},
-							},
-						},
-					},
+			// Use ArraySubQuery for cleaner SQL
+			subqueryExpr = &ast.ArraySubQuery{
+				Query: &ast.Query{
+					Query: structSelect,
 				},
 			}
 		} else {
 			// Single STRUCT for belongs_to
 			subqueryExpr = &ast.ScalarSubQuery{
-				Query: &ast.SubQuery{
-					Query: &ast.Query{
-						Query: &ast.Select{
-							As:      &ast.AsStruct{},
-							Results: subSelect.Results,
-							From:    subSelect.From,
-							Where:   subSelect.Where,
-						},
+				Query: &ast.Query{
+					Query: &ast.Select{
+						As:      &ast.AsStruct{},
+						Results: subSelect.Results,
+						From:    subSelect.From,
+						Where:   subSelect.Where,
 					},
 				},
 			}
