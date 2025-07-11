@@ -200,44 +200,8 @@ func WithOne[TBase types.Table, TTarget types.Table](
 	keys KeyPair,
 	opts ...types.Option[TTarget],
 ) types.QueryOption[TBase] {
-	return withSingleSubquery[TBase, TTarget](relationshipName, targetTable, keys, "", KeyPair{}, opts...)
-}
-
-// WithMany adds an array subquery column (for has_many relationships)
-// Generates: ARRAY(SELECT AS STRUCT t.* FROM t WHERE t.foreign_key = parent.id)
-func WithMany[TBase types.Table, TTarget types.Table](
-	relationshipName string,
-	targetTable string,
-	keys KeyPair,
-	opts ...types.Option[TTarget],
-) types.QueryOption[TBase] {
-	return withManySubquery[TBase, TTarget](relationshipName, targetTable, keys, opts...)
-}
-
-// WithManyThrough adds an array subquery column (for many_to_many relationships through a junction table)
-// Generates: ARRAY(SELECT AS STRUCT t.* FROM t JOIN junction ON ... WHERE junction.foreign_key = parent.id)
-func WithManyThrough[TBase types.Table, TTarget types.Table](
-	relationshipName string,
-	targetTable string,
-	keys KeyPair,
-	junctionTable string,
-	junctionKeys KeyPair,
-	opts ...types.Option[TTarget],
-) types.QueryOption[TBase] {
-	return withManyThroughSubquery[TBase, TTarget](relationshipName, targetTable, keys, junctionTable, junctionKeys, opts...)
-}
-
-// withSingleSubquery handles single-value subqueries (belongs_to relationships)
-func withSingleSubquery[TBase types.Table, TTarget types.Table](
-	relationshipName string,
-	targetTable string,
-	keys KeyPair,
-	junctionTable string,
-	junctionKeys KeyPair,
-	opts ...types.Option[TTarget],
-) types.QueryOption[TBase] {
 	return func(s *types.State, q *ast.Query) {
-		sq := newSubquery(s, targetTable, keys, junctionTable, junctionKeys)
+		sq := newSubquery(s, targetTable, keys, "", KeyPair{})
 
 		// Build basic subquery
 		subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
@@ -266,8 +230,9 @@ func withSingleSubquery[TBase types.Table, TTarget types.Table](
 	}
 }
 
-// withManySubquery handles direct has_many array subqueries
-func withManySubquery[TBase types.Table, TTarget types.Table](
+// WithMany adds an array subquery column (for has_many relationships)
+// Generates: ARRAY(SELECT AS STRUCT t.* FROM t WHERE t.foreign_key = parent.id)
+func WithMany[TBase types.Table, TTarget types.Table](
 	relationshipName string,
 	targetTable string,
 	keys KeyPair,
@@ -309,8 +274,9 @@ func withManySubquery[TBase types.Table, TTarget types.Table](
 	}
 }
 
-// withManyThroughSubquery handles many-to-many array subqueries through junction tables
-func withManyThroughSubquery[TBase types.Table, TTarget types.Table](
+// WithManyThrough adds an array subquery column (for many_to_many relationships through a junction table)
+// Generates: ARRAY(SELECT AS STRUCT t.* FROM t JOIN junction ON ... WHERE junction.foreign_key = parent.id)
+func WithManyThrough[TBase types.Table, TTarget types.Table](
 	relationshipName string,
 	targetTable string,
 	keys KeyPair,
