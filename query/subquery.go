@@ -125,3 +125,98 @@ func (sq *subquery) applyOptions(subQuery *ast.Query, opts []types.Option[types.
 	// Update parent state params
 	sq.parentState.Params = sq.subState.Params
 }
+
+// buildAndApplyOptions builds basic subquery and applies options
+func (sq *subquery) buildAndApplyOptions(opts []types.Option[types.Table]) *ast.Query {
+	subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
+	sq.applyOptions(subQuery, opts)
+	return subQuery
+}
+
+// addSubqueryColumn adds a subquery column to the parent state
+func (sq *subquery) addSubqueryColumn(s *types.State, relationshipName string, subqueryExpr ast.Expr) {
+	s.SubqueryColumns = append(s.SubqueryColumns, types.SubqueryColumn{
+		Alias:    relationshipName,
+		Subquery: subqueryExpr,
+	})
+}
+
+// extractAdditionalWhere extracts WHERE conditions from options
+func (sq *subquery) extractAdditionalWhere(subQuery *ast.Query) ast.Expr {
+	subSelect := subQuery.Query.(*ast.Select)
+	if subSelect.Where != nil {
+		return subSelect.Where.Expr
+	}
+	return nil
+}
+
+// buildScalarSubquery builds a scalar subquery for belongs_to relationships
+func (sq *subquery) buildScalarSubquery(subQuery *ast.Query) ast.Expr {
+	subSelect := subQuery.Query.(*ast.Select)
+	return &ast.ScalarSubQuery{
+		Query: &ast.Query{
+			Query: &ast.Select{
+				As:      &ast.AsStruct{},
+				Results: subSelect.Results,
+				From:    subSelect.From,
+				Where:   subSelect.Where,
+			},
+		},
+	}
+}
+
+// buildArraySubquery builds an array subquery for has_many relationships
+func (sq *subquery) buildArraySubquery(subQuery *ast.Query) ast.Expr {
+	subSelect := subQuery.Query.(*ast.Select)
+	structSelect := &ast.Select{
+		As:      &ast.AsStruct{},
+		Results: []ast.SelectItem{&ast.Star{}},
+		From: &ast.From{
+			Source: &ast.TableName{
+				Table: &ast.Ident{Name: sq.targetTable},
+			},
+		},
+		Where: subSelect.Where,
+	}
+
+	return &ast.ArraySubQuery{
+		Query: &ast.Query{
+			Query: structSelect,
+		},
+	}
+}
+
+// buildArrayThroughSubquery builds an array subquery for many_to_many relationships
+func (sq *subquery) buildArrayThroughSubquery(subQuery *ast.Query, additionalWhere ast.Expr) ast.Expr {
+	structSelect := &ast.Select{
+		As: &ast.AsStruct{},
+		Results: []ast.SelectItem{
+			&ast.DotStar{
+				Expr: &ast.Path{
+					Idents: []*ast.Ident{{Name: sq.targetTable}},
+				},
+			},
+		},
+		From: &ast.From{
+			Source: sq.buildJunctionJoin(),
+		},
+		Where: &ast.Where{
+			Expr: sq.buildJunctionCorrelation(),
+		},
+	}
+
+	// Apply additional WHERE conditions from options
+	if additionalWhere != nil {
+		structSelect.Where.Expr = &ast.BinaryExpr{
+			Op:    ast.OpAnd,
+			Left:  structSelect.Where.Expr,
+			Right: additionalWhere,
+		}
+	}
+
+	return &ast.ArraySubQuery{
+		Query: &ast.Query{
+			Query: structSelect,
+		},
+	}
+}

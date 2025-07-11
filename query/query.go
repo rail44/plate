@@ -202,31 +202,9 @@ func WithOne[TBase types.Table, TTarget types.Table](
 ) types.QueryOption[TBase] {
 	return func(s *types.State, q *ast.Query) {
 		sq := newSubquery(s, targetTable, keys, "", KeyPair{})
-
-		// Build basic subquery
-		subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
-
-		// Apply options
-		sq.applyOptions(subQuery, convertOptions(opts))
-
-		// Create scalar subquery for single value
-		subSelect := subQuery.Query.(*ast.Select)
-		subqueryExpr := &ast.ScalarSubQuery{
-			Query: &ast.Query{
-				Query: &ast.Select{
-					As:      &ast.AsStruct{},
-					Results: subSelect.Results,
-					From:    subSelect.From,
-					Where:   subSelect.Where,
-				},
-			},
-		}
-
-		// Add to state's subquery columns
-		s.SubqueryColumns = append(s.SubqueryColumns, types.SubqueryColumn{
-			Alias:    relationshipName,
-			Subquery: subqueryExpr,
-		})
+		subQuery := sq.buildAndApplyOptions(convertOptions(opts))
+		subqueryExpr := sq.buildScalarSubquery(subQuery)
+		sq.addSubqueryColumn(s, relationshipName, subqueryExpr)
 	}
 }
 
@@ -240,37 +218,9 @@ func WithMany[TBase types.Table, TTarget types.Table](
 ) types.QueryOption[TBase] {
 	return func(s *types.State, q *ast.Query) {
 		sq := newSubquery(s, targetTable, keys, "", KeyPair{})
-
-		// Build basic subquery
-		subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
-
-		// Apply options
-		sq.applyOptions(subQuery, convertOptions(opts))
-
-		// Create direct has_many array subquery
-		subSelect := subQuery.Query.(*ast.Select)
-		structSelect := &ast.Select{
-			As:      &ast.AsStruct{},
-			Results: []ast.SelectItem{&ast.Star{}},
-			From: &ast.From{
-				Source: &ast.TableName{
-					Table: &ast.Ident{Name: targetTable},
-				},
-			},
-			Where: subSelect.Where,
-		}
-
-		subqueryExpr := &ast.ArraySubQuery{
-			Query: &ast.Query{
-				Query: structSelect,
-			},
-		}
-
-		// Add to state's subquery columns
-		s.SubqueryColumns = append(s.SubqueryColumns, types.SubqueryColumn{
-			Alias:    relationshipName,
-			Subquery: subqueryExpr,
-		})
+		subQuery := sq.buildAndApplyOptions(convertOptions(opts))
+		subqueryExpr := sq.buildArraySubquery(subQuery)
+		sq.addSubqueryColumn(s, relationshipName, subqueryExpr)
 	}
 }
 
@@ -286,59 +236,10 @@ func WithManyThrough[TBase types.Table, TTarget types.Table](
 ) types.QueryOption[TBase] {
 	return func(s *types.State, q *ast.Query) {
 		sq := newSubquery(s, targetTable, keys, junctionTable, junctionKeys)
-
-		// Build basic subquery
-		subQuery := sq.buildBasicSubquery([]ast.SelectItem{&ast.Star{}})
-
-		// Apply options
-		sq.applyOptions(subQuery, convertOptions(opts))
-
-		// Create many-to-many array subquery with JOIN
-		subSelect := subQuery.Query.(*ast.Select)
-
-		// Check for additional WHERE conditions from options
-		var additionalWhere ast.Expr
-		if subSelect.Where != nil {
-			additionalWhere = subSelect.Where.Expr
-		}
-
-		structSelect := &ast.Select{
-			As: &ast.AsStruct{},
-			Results: []ast.SelectItem{
-				&ast.DotStar{
-					Expr: &ast.Path{
-						Idents: []*ast.Ident{{Name: targetTable}},
-					},
-				},
-			},
-			From: &ast.From{
-				Source: sq.buildJunctionJoin(),
-			},
-			Where: &ast.Where{
-				Expr: sq.buildJunctionCorrelation(),
-			},
-		}
-
-		// Apply additional WHERE conditions from options
-		if additionalWhere != nil {
-			structSelect.Where.Expr = &ast.BinaryExpr{
-				Op:    ast.OpAnd,
-				Left:  structSelect.Where.Expr,
-				Right: additionalWhere,
-			}
-		}
-
-		subqueryExpr := &ast.ArraySubQuery{
-			Query: &ast.Query{
-				Query: structSelect,
-			},
-		}
-
-		// Add to state's subquery columns
-		s.SubqueryColumns = append(s.SubqueryColumns, types.SubqueryColumn{
-			Alias:    relationshipName,
-			Subquery: subqueryExpr,
-		})
+		subQuery := sq.buildAndApplyOptions(convertOptions(opts))
+		additionalWhere := sq.extractAdditionalWhere(subQuery)
+		subqueryExpr := sq.buildArrayThroughSubquery(subQuery, additionalWhere)
+		sq.addSubqueryColumn(s, relationshipName, subqueryExpr)
 	}
 }
 
